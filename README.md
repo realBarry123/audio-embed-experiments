@@ -1,1 +1,3 @@
 # audio-embed-experiments
+
+Note about dependencies: [diffusers](https://github.com/huggingface/diffusers) is imported via [a fix](https://github.com/huggingface/diffusers/pull/13754/changes/51906b8b3dd43bafa8a3a45f2b62b1af6812b91b) by zxuhan. The [torchsde](https://github.com/google-research/torchsde) used here is [a fork](https://github.com/realBarry123/torchsde) created by me with the help of Claude to fix incompatability with Python 3.13. Hopefully this works. 

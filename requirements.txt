@@ -1,0 +1,9 @@
+git+https://github.com/huggingface/diffusers.git@51906b8b3dd43bafa8a3a45f2b62b1af6812b91b
+einops
+nnsight
+python-dotenv
+soundfile
+torch
+git+https://github.com/realBarry123/torchsde.git
+transformers
+tqdm
