@@ -1,10 +1,16 @@
 import os
+import sys
 import datetime
+
 import torch
 import soundfile as sf
 from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from tqdm import tqdm
+
+if len(sys.argv) != 2:
+    raise SystemExit(f"Incorrect number of command line arguments")
+prompt = sys.argv[1]
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -15,15 +21,15 @@ DEVICE = os.getenv("DEVICE")
 if not CACHE_PATH or not DEVICE:
     raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
 
-prompt = input("Enter text prompt >>> ")
+# Create folder for results
 timestamp = str(datetime.datetime.now().strftime("%y-%m-%dT%H:%M:%S"))
 
-# Create folder for results
 if not os.path.exists(timestamp):
     os.makedirs(timestamp)
 else:
     raise ZeroDivisionError("Time is moving backwards!")
 
+# Model
 model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
     torch_dtype=torch.float16,
@@ -32,7 +38,6 @@ model = DiffusionModel(
     device_map=DEVICE
 )
 
-# set the seed for generator
 generator = torch.Generator(DEVICE).manual_seed(0)
 
 audios = []
