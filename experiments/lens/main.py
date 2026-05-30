@@ -62,18 +62,10 @@ for layer in tqdm(range(0, model.text_encoder.config.num_hidden_layers-1, 1)):
             print(f"layer: {layer}")
             # replace the final_layer_norm input with the text_encoder's output for the layer.
             hidden_state = model.text_encoder.encoder.block[layer].output[0]#.save()
-            print("max hidden_state value:", hidden_state.max().item())
-            print("hidden_state:", hidden_state.shape)
-            print("ranges of hidden_state:", hidden_state.min().item(), hidden_state.max().item())
+            print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
             model.text_encoder.encoder.final_layer_norm.input = hidden_state# [0][:] = hidden_state
-            # fln_output = model.text_encoder.encoder.final_layer_norm.output[0]
-            # print("ranges of fln_output:", fln_output.min().item(), fln_output.max().item()) # thats fine
             # Save the generated audio
             audio = model.output.audios[0].save()
-            print("model.output.audios:", model.output.audios)
-            audios.append(audio)
-            output = audio[0].T.float().cpu().numpy()
-            print("max audio value:", audio.max().item())
-            print("max output value:", output.max().item())
-            sf.write(f"experiments/lens/layers/layer{layer}.wav", output, model.vae.sampling_rate)
-            exit()
+            # audios.append(audio)
+            audio = audio[0].T.float().cpu().numpy()
+            sf.write(f"experiments/lens/layers/layer{layer}.wav", audio, model.vae.sampling_rate)
