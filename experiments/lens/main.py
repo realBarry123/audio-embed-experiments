@@ -16,8 +16,8 @@ model = DiffusionModel(
     torch_dtype=torch.float16,
     cache_dir=CACHE_PATH,
     #dispatch=True,
-    #device_map=DEVICE
-).to(DEVICE)
+    device_map=DEVICE
+)
 
 # define the prompts
 prompt = "The sound of a hammer hitting a wooden surface."
