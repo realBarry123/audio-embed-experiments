@@ -25,7 +25,7 @@ if not CACHE_PATH or not DEVICE:
 timestamp = str(datetime.datetime.now().strftime("%y-%m-%dT%H:%M:%S"))
 
 if not os.path.exists(timestamp):
-    os.makedirs("experiments/lens/results" / timestamp)
+    os.makedirs(f"experiments/lens/results/{timestamp}")
 else:
     raise ZeroDivisionError("Time is moving backwards!")
 
