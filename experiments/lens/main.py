@@ -15,9 +15,9 @@ model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
     torch_dtype=torch.float16,
     cache_dir=CACHE_PATH,
-    dispatch=True,
-    device_map=DEVICE
-)
+    #dispatch=True,
+    #device_map=DEVICE
+).to(DEVICE)
 
 # define the prompts
 prompt = "The sound of a hammer hitting a wooden surface."
