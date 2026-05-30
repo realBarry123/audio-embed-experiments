@@ -50,12 +50,12 @@ sf.write(f"layers/all.wav", output, model.vae.sampling_rate)
 exit()
 """
 
-for layer in tqdm(range(0, model.text_encoder.config.num_hidden_layers-1, 1)):
+for layer in tqdm(range(model.text_encoder.config.num_hidden_layers)):
     with torch.no_grad():
         with model.generate(
             prompt,
-            num_inference_steps=5, # 200
-            audio_end_in_s=2.0,
+            num_inference_steps=200, # 200
+            audio_end_in_s=4.0,
             seed=0
         ):
             # layer = -1
