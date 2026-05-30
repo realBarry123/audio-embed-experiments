@@ -15,7 +15,7 @@ DEVICE = os.getenv("DEVICE")
 if not CACHE_PATH or not DEVICE:
     raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
 
-prompt = input()
+prompt = input("Enter text prompt >>> ")
 timestamp = str(datetime.datetime.now().strftime("%y-%m-%dT%H:%M:%S"))
 
 # Create folder for results
