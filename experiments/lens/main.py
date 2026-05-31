@@ -29,7 +29,6 @@ if not os.path.exists(timestamp):
 else:
     raise ZeroDivisionError("Time is moving backwards!")
 
-# Model
 model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
     torch_dtype=torch.float16,
@@ -38,11 +37,7 @@ model = DiffusionModel(
     device_map=DEVICE
 )
 
-generator = torch.Generator(DEVICE).manual_seed(0)
-
-audios = []
-
-for layer in tqdm(range(model.text_encoder.config.num_hidden_layers)):
+for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
     with torch.no_grad():
         with model.generate(
             prompt,
@@ -50,15 +45,14 @@ for layer in tqdm(range(model.text_encoder.config.num_hidden_layers)):
             audio_end_in_s=4.0,
             seed=0
         ):
-            # layer = -1
+            if layer == -1:
+                pass
+                continue
             print(f"\n\nlayer: {layer}")
-            # replace the final_layer_norm input with the text_encoder's output for the layer.
-            hidden_state = model.text_encoder.encoder.block[layer].output[0]#.save()
+            hidden_state = model.text_encoder.encoder.block[layer].output[0]
             print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
-            model.text_encoder.encoder.final_layer_norm.input = hidden_state# [0][:] = hidden_state
-            # Save the generated audio
+            model.text_encoder.encoder.final_layer_norm.input = hidden_state
             audio = model.output.audios[0].save()
-            # audios.append(audio)
             audio = audio[0].T.float().cpu().numpy()
             sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
 
