@@ -4,7 +4,8 @@ nnsight
 python-dotenv
 soundfile
 git+https://github.com/Stability-AI/stable-audio-3.git
-torch
+torch==2.11.0
 git+https://github.com/realBarry123/torchsde.git
+torchvision==0.26.0
 transformers
 tqdm
