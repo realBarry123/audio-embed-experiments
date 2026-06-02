@@ -3,9 +3,8 @@ einops
 nnsight
 python-dotenv
 soundfile
-git+https://github.com/Stability-AI/stable-audio-3.git
-torch==2.11.0
+torch
 git+https://github.com/realBarry123/torchsde.git
-torchvision==0.26.0
+torchvision
 transformers
 tqdm
