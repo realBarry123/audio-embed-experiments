@@ -10,3 +10,7 @@ dependencies = [
     "torch",
     "einops"
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["audembed*"]
