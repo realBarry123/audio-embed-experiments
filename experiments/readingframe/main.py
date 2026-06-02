@@ -10,8 +10,6 @@ from tqdm import tqdm
 
 from audembed import plot
 
-exit()
-
 if len(sys.argv) != 2:
     raise SystemExit(f"Incorrect number of command line arguments")
 AUDIO_PATH = f"experiments/readingframe/inputs/{sys.argv[1]}"
