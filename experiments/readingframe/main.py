@@ -7,6 +7,7 @@ import soundfile as sf
 from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from tqdm import tqdm
+from einops import rearrange
 
 from audembed import plot
 
@@ -40,17 +41,29 @@ model = DiffusionModel(
 
 audio, fs = sf.read(AUDIO_PATH)
 
-audio = torch.Tensor(audio).T
+audio = torch.Tensor(audio).T.to(DEVICE).half()
 print(audio.shape)
 
-def encode_frame(x: torch.Tensor, vae: torch.nn.Module) -> torch.Tensor:
-    assert list[x.shape] == [512, 2]
-    with vae.no_grad():
-        return vae(x)
+def encode_frame(x: torch.Tensor, encoder: torch.nn.Module) -> torch.Tensor:
+    print(encoder)
+    if list(x.shape) != [2, 512]:
+        raise ValueError(f"Unexpected shape for single frame (expected [2, 512], got {str(list(x.shape))})")
+    x = x.unsqueeze(0) # add batch dim
+    #with encoder.no_grad():
+    return encoder(x)
 
-latent = encode_frame(audio[:512], model.vae)
+# latent = encode_frame(audio[:, :512], model._model.vae.encoder)
+
+with model.trace("_"):
+    latent = model.vae.encoder(audio[:, :2048].unsqueeze(0)).save()#.value
+    
 print(latent.shape)
 print(model.vae.config)
+# [batch, param * channel, frame]
+latent = rearrange(latent, "1 (p c) 1 -> c p", c=64, p=2)
+print(latent.shape)
+
+
 exit()
 
 with open("experiments/readingframe/results/report.txt", "a") as f:
