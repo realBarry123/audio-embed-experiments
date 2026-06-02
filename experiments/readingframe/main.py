@@ -38,7 +38,18 @@ model = DiffusionModel(
     device_map=DEVICE
 )
 
-print(model.vae)
+audio, fs = sf.read(AUDIO_PATH)
+
+audio = torch.Tensor(audio).T
+print(audio.shape)
+
+def encode_frame(x: torch.Tensor, vae: torch.nn.Module) -> torch.Tensor:
+    assert list[x.shape] == [512, 2]
+    with vae.no_grad():
+        return vae(x)
+
+latent = encode_frame(audio[:512], model.vae)
+print(latent.shape)
 print(model.vae.config)
 exit()
 
