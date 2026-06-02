@@ -46,15 +46,16 @@ for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
             seed=0
         ):
             if layer == -1:
+                #TODO
                 pass
-                continue
-            print(f"\n\nlayer: {layer}")
-            hidden_state = model.text_encoder.encoder.block[layer].output[0]
-            print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
-            model.text_encoder.encoder.final_layer_norm.input = hidden_state
-            audio = model.output.audios[0].save()
-            audio = audio[0].T.float().cpu().numpy()
-            sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
+            else:
+                print(f"\n\nlayer: {layer}")
+                hidden_state = model.text_encoder.encoder.block[layer].output[0]
+                print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
+                model.text_encoder.encoder.final_layer_norm.input = hidden_state
+                audio = model.output.audios[0].save()
+                audio = audio[0].T.float().cpu().numpy()
+                sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
 
 with open("experiments/lens/results/report.txt", "a") as f:
     f.write(f"{timestamp}: \'{prompt}\'")
