@@ -27,10 +27,10 @@ if not CACHE_PATH or not DEVICE:
 # Create folder for results
 timestamp = str(datetime.datetime.now().strftime("%y-%m-%dT%H:%M:%S"))
 
-if not os.path.exists(timestamp):
-    os.makedirs(f"experiments/readingframe/results/{timestamp}")
-else:
-    raise ZeroDivisionError("Not even a zero division, time is moving backwards! Try again")
+#if not os.path.exists(timestamp):
+#    os.makedirs(f"experiments/readingframe/results/{timestamp}")
+#else:
+#    raise ZeroDivisionError("Not even a zero division, time is moving backwards! Try again")
 
 model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
@@ -40,31 +40,24 @@ model = DiffusionModel(
 )
 
 audio, fs = sf.read(AUDIO_PATH)
-
 audio = torch.Tensor(audio).T.to(DEVICE).half()
-print(audio.shape)
+print(f"Loaded audio with shape: {str(audio.shape)}") # [2, samples]
 
-def encode_frame(x: torch.Tensor, encoder: torch.nn.Module) -> torch.Tensor:
-    print(encoder)
-    if list(x.shape) != [2, 512]:
-        raise ValueError(f"Unexpected shape for single frame (expected [2, 512], got {str(list(x.shape))})")
-    x = x.unsqueeze(0) # add batch dim
-    #with encoder.no_grad():
-    return encoder(x)
+latents = []
 
-# latent = encode_frame(audio[:, :512], model._model.vae.encoder)
-
-with model.trace("_"):
-    latent = model.vae.encoder(audio[:, :2048].unsqueeze(0)).save()#.value
+for t in tqdm(range(0, audio.shape[1]-2048+1, (audio.shape[1]-2048+1)//64)):
+    with model.trace("_"):
+        latent = model.vae.encoder(audio[:, t:t+2048].unsqueeze(0)).save() # [batch, param*channel, frame]
     
-print(latent.shape)
-print(model.vae.config)
-# [batch, param * channel, frame]
-latent = rearrange(latent, "1 (p c) 1 -> c p", c=64, p=2)
-print(latent.shape)
+    latent = rearrange(latent, "1 (p c) 1 -> c p", c=64, p=2)
+    latents.append(latent[:, 1].detach()) # take only the mean
+    
+latents = torch.stack(latents)
+print(latents.shape)
 
+# plot.plot_states(latents)
+torch.save(latents, f"experiments/readingframe/results/latents.pt")
 
-exit()
 
 with open("experiments/readingframe/results/report.txt", "a") as f:
     f.write(f"{timestamp}: {AUDIO_PATH}")
