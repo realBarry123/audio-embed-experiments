@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from einops import rearrange
 
-from audembed import plot
+from audembed import data
 
 if len(sys.argv) != 2:
     raise SystemExit(f"Incorrect number of command line arguments")
