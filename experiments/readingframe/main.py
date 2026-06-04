@@ -45,18 +45,15 @@ print(f"Loaded audio with shape: {str(audio.shape)}") # [2, samples]
 
 latents = []
 
-for t in tqdm(range(0, audio.shape[1]-2048+1, (audio.shape[1]-2048+1)//64)):
+for t in tqdm(range(0, audio.shape[1]-2048+1, 441)):
     with model.trace("_"):
         latent = model.vae.encoder(audio[:, t:t+2048].unsqueeze(0)).save() # [batch, param*channel, frame]
     
     latent = rearrange(latent, "1 (p c) 1 -> c p", c=64, p=2)
-    latent = data.pca_reduce(latent[:, 1].detach(), pcs=3) # 3 pcs of mean only
-    latents.append(latent)
+    latents.append(latent[:, 1].detach())
     
 latents = torch.stack(latents)
-print(latents.shape)
-
-# plot.plot_states(latents)
+latents = data.pca_reduce(latents, pcs=3)
 torch.save(latents, f"experiments/readingframe/results/latents.pt")
 
 
