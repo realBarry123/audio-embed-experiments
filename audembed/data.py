@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 def pca_reduce(x: torch.Tensor, pcs: int) -> torch.Tensor:
     """Reduce dimension of sequence of states using PCA
@@ -42,34 +46,59 @@ def plot_states(x, title=None):
     
     fig = plt.figure()
     timesteps = torch.arange(x.shape[0], dtype=torch.float32)
+    colors = plt.get_cmap("viridis")(Normalize(vmin=timesteps.min().item(), vmax=timesteps.max().item())(timesteps.cpu().numpy()))
 
     if x.shape[1] == 2:
         ax = fig.add_subplot()
+        points = x[:, :2].cpu().numpy()
+        segments = np.stack([points[:-1], points[1:]], axis=1)
+        line = LineCollection(
+            segments,
+            colors=colors[:-1],
+            linewidths=1,
+            alpha=0.8,
+            zorder=1,
+        )
+        ax.add_collection(line)
         scatter = ax.scatter(
-            x[:, 0].cpu().numpy(),
-            x[:, 1].cpu().numpy(),
+            points[:, 0],
+            points[:, 1],
             c=timesteps.cpu().numpy(),
             cmap="viridis",
-            s=25,
-            edgecolors="none"
+            s=10,
+            edgecolors="none",
+            zorder=2,
         )
         ax.set_xlabel("PC 1")
         ax.set_ylabel("PC 2")
+        ax.autoscale_view()
 
     elif x.shape[1] == 3:
         ax = fig.add_subplot(projection='3d')
+        points = x[:, :3].cpu().numpy()
+        segments = np.stack([points[:-1], points[1:]], axis=1)
+        line = Line3DCollection(
+            segments,
+            colors=colors[:-1],
+            linewidths=1,
+            alpha=0.8,
+            zorder=1,
+        )
+        ax.add_collection(line)
         scatter = ax.scatter(
-            x[:, 0].cpu().numpy(),
-            x[:, 1].cpu().numpy(),
-            x[:, 2].cpu().numpy(),
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
             c=timesteps.cpu().numpy(),
             cmap="viridis",
-            s=25,
-            edgecolors="none"
+            s=10,
+            edgecolors="none",
+            zorder=2,
         )
         ax.set_xlabel("PC 1")
         ax.set_ylabel("PC 2")
         ax.set_zlabel("PC 3")
+        ax.auto_scale_xyz(points[:, 0], points[:, 1], points[:, 2])
     
     else:
         raise ValueError(f"dimensions must be 2 or 3")
