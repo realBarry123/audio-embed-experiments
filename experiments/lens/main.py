@@ -37,6 +37,8 @@ model = DiffusionModel(
     device_map=DEVICE
 )
 
+print(model.text_encoder)
+
 for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
     with torch.no_grad():
         with model.generate(
@@ -45,17 +47,17 @@ for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
             audio_end_in_s=4.0,
             seed=0
         ):
+            print(f"\n\nlayer: {layer}")
             if layer == -1:
-                #TODO
-                pass
-            else:
-                print(f"\n\nlayer: {layer}")
-                hidden_state = model.text_encoder.encoder.block[layer].output[0]
-                print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
+                hidden_state = model.text_encoder.encoder.block[0].input
                 model.text_encoder.encoder.final_layer_norm.input = hidden_state
-                audio = model.output.audios[0].save()
-                audio = audio.T.float().cpu().numpy()
-                sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
+            else:
+                hidden_state = model.text_encoder.encoder.block[layer].output[0]
+                model.text_encoder.encoder.final_layer_norm.input = hidden_state
+
+            audio = model.output.audios[0].save()
+            audio = audio.T.float().cpu().numpy()
+            sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
 
 with open("experiments/lens/results/report.txt", "a") as f:
     f.write(f"{timestamp}: \'{prompt}\'")
