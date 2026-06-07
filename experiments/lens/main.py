@@ -54,7 +54,7 @@ for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
                 print("range of hidden state:", hidden_state.min().item(), hidden_state.max().item())
                 model.text_encoder.encoder.final_layer_norm.input = hidden_state
                 audio = model.output.audios[0].save()
-                audio = audio[0].T.float().cpu().numpy()
+                audio = audio[0].float().cpu().numpy()
                 sf.write(f"experiments/lens/results/{timestamp}/layer{layer}.wav", audio, model.vae.sampling_rate)
 
 with open("experiments/lens/results/report.txt", "a") as f:
