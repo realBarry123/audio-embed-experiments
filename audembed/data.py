@@ -32,7 +32,7 @@ def pca_reduce(x: torch.Tensor, pcs: int) -> torch.Tensor:
 
     return x @ components
 
-def plot_states(x, title=None):
+def plot_latent(x, title=None):
     """Plot state trajectories in 2D using PCA.
 
     Args:
@@ -113,8 +113,9 @@ def plot_states(x, title=None):
 
     return ax
 
+def plot_weight(x, title=None):
+    raise NotImplementedError()
+
 if __name__ == "__main__":
-    plot_states(
-        pca_reduce(torch.rand((67, 1024)), 3),
-        title="Test"
-    )
+    latents = torch.load("experiments/readingframe/results/a.pt", map_location=torch.device('cpu'))
+    plot_latent(latents)
