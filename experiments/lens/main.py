@@ -23,7 +23,6 @@ if not CACHE_PATH or not DEVICE:
 
 # Create folder for results
 timestamp = str(datetime.datetime.now().strftime("%y-%m-%dT%H:%M:%S"))
-
 if not os.path.exists(timestamp):
     os.makedirs(f"experiments/lens/results/{timestamp}")
 else:
@@ -49,7 +48,7 @@ for layer in tqdm(range(-1, model.text_encoder.config.num_hidden_layers)):
         ):
             print(f"\n\nlayer: {layer}")
             if layer == -1:
-                hidden_state = model.text_encoder.encoder.block[0].input
+                hidden_state = model.text_encoder.encoder.embed_tokens.output[0]
                 model.text_encoder.encoder.final_layer_norm.input = hidden_state
             else:
                 hidden_state = model.text_encoder.encoder.block[layer].output[0]
