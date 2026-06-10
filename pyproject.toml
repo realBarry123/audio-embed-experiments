@@ -8,7 +8,9 @@ version = "0.1.0"
 dependencies = [
     "matplotlib",
     "torch",
-    "einops"
+    "einops",
+    "mirdata",
+    "numpy"
 ]
 
 [tool.setuptools.packages.find]
