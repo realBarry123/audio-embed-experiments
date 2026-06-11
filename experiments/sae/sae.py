@@ -1,7 +1,5 @@
-import numpy as np
 import torch
 from torch import nn
-from torch.utils.data.sampler import SubsetRandomSampler
 from tqdm import tqdm
 
 from audembed import datasets
@@ -97,3 +95,65 @@ def valid_sae(
     
     return total_loss / total
 
+if __name__ == "__main__":
+    import os
+    from nnsight.modeling.diffusion import DiffusionModel
+    from dotenv import load_dotenv
+
+    EPOCHS = 16
+    BATCH_SIZE = 32
+    SEED = 123
+
+    try: 
+        state_dict, configs, epoch = torch.load("models/sae.pt")
+        model = SAE(**configs)
+        model.load_state_dict(state_dict)
+    except:
+        model = SAE(latent_dim=64, feature_dim=2048)
+    
+    dataset = datasets.MIRDataset("orchset")
+    train_loader, valid_loader = dataset.get_loaders(valid_split=0.2, batch_size=32)
+
+    optim = torch.optim.Adam(params=model.parameters(), lr=0.0005)
+
+    if not load_dotenv():
+        raise SystemExit("No .env file found, please make one in the root directory")
+
+    CACHE_PATH = os.getenv("CACHE_PATH")
+    DEVICE = os.getenv("DEVICE")
+
+    if not CACHE_PATH or not DEVICE:
+        raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
+    
+    diffusion_model = DiffusionModel(
+        "stabilityai/stable-audio-open-1.0",
+        torch_dtype=torch.float16,
+        cache_dir=CACHE_PATH,
+        device_map=DEVICE
+    )
+
+    def encode_fn(x):
+        with diffusion_model.trace("_"):
+            latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
+        return latent
+
+    for epoch in range(epoch, epoch + EPOCHS):
+        train_loss = train_sae(
+            model, 
+            train_loader, 
+            optim, 
+            lamb=0.01, 
+            encode_fn=encode_fn, 
+            epoch=epoch, 
+            device=DEVICE
+        )
+        valid_loss = valid_sae(
+            model,
+            valid_loader,
+            lamb=0.01, 
+            encode_fn=encode_fn, 
+            epoch=epoch, 
+            device=DEVICE
+        )
+        epochs += 1
+        torch.save([model.state_dict(), model.configs, epoch], "models/sae.pt")
