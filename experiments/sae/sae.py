@@ -99,6 +99,9 @@ if __name__ == "__main__":
     import os
     from nnsight.modeling.diffusion import DiffusionModel
     from dotenv import load_dotenv
+    import wandb
+
+    DO_WANDB = True
 
     EPOCHS = 16
     BATCH_SIZE = 32
@@ -110,6 +113,13 @@ if __name__ == "__main__":
         model.load_state_dict(state_dict)
     except:
         model = SAE(latent_dim=64, feature_dim=2048)
+    
+    if DO_WANDB:
+        run = wandb.init(
+            entity="barry-and-only-barry",
+            project="audio-embed-experiments",
+            config=configs,
+        )
     
     dataset = datasets.MIRDataset("orchset")
     train_loader, valid_loader = dataset.get_loaders(valid_split=0.2, batch_size=32)
@@ -155,5 +165,7 @@ if __name__ == "__main__":
             epoch=epoch, 
             device=DEVICE
         )
+        if DO_WANDB: 
+            run.log({"train_loss": train_loss, "valid_loss": valid_loss})
         epochs += 1
         torch.save([model.state_dict(), model.configs, epoch], "models/sae.pt")
