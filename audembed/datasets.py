@@ -9,17 +9,21 @@ class MIRDataset(Dataset):
     """
     Adapted from https://mirdata.readthedocs.io/en/stable/source/tutorial.html 06-09-2026
     """
-    def __init__(self, dataset_name: str):
-
-        # Initialize the loader, download if required, and validate
+    def __init__(self, dataset_name: str, chunk_duration=5.0):
         self.loader = mirdata.initialize(dataset_name)
         self.loader.download()
         self.loader.validate()
 
-        # Used for padding tensors
-        self.longest_track = max(
-            [len(self.loader.track(tid).audio_mono[0]) for tid in self.loader.track_ids]
-        )
+        self.chunk_duration = chunk_duration
+        self.chunk_index = []
+
+        for tid in self.loader.track_ids:
+            audio_signal, fs = self.loader.track(tid).audio_mono
+            chunk_size = int(round(self.chunk_duration * fs))
+            n_chunks = int(np.floor(len(audio_signal) / chunk_size)) # discard last chunk
+            for i in range(n_chunks):
+                start = i * chunk_size
+                self.chunk_index.append((tid, start, chunk_size))
 
     @staticmethod
     def pad(to_pad: np.ndarray, pad_size: int) -> np.ndarray:
@@ -34,16 +38,14 @@ class MIRDataset(Dataset):
     def __len__(self):
         return len(self.loader.track_ids)
 
-    def __getitem__(self, item: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-
-        track_id = self.loader.track_ids[item]
+    def __getitem__(self, item: int) -> np.ndarray:
+        track_id, start, chunk_size = self.chunk_index[item]
         track = self.loader.track(track_id)
-
         audio_signal, fs = track.audio_mono
 
-        audio_signal_padded = self.pad(audio_signal, self.longest_track)
+        chunk = audio_signal[start:start + chunk_size]
 
-        return audio_signal_padded.astype(np.float32)
+        return chunk.astype(np.float32)
 
     def get_loaders(self, valid_split, batch_size, seed=0):
         """
