@@ -20,13 +20,13 @@ class SAE(nn.Module):
     
     def encode(self, x):
         x = self.encoder_linear(x)
-        x = self.relu(x)
-        x = self.norm(x)
+        if self.configs["do_relu"]: x = self.relu(x)
+        if self.configs["do_norm"]: x = self.norm(x)
         return x
     
     def decode(self, x):
         x = self.decoder_linear(x)
-        x = self.relu(x)
+        if self.configs["do_relu"]: x = self.relu(x)
         return x
 
     def forward(self, x):
