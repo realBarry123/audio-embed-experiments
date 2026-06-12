@@ -63,7 +63,7 @@ def train_sae(
         total_loss += loss.item()
         total_sparsity_loss += sparsity_loss.item()
 
-        l0 = (h > 1e-8).float().sum(dim=-1).mean()
+        l0 = (h.abs() > 1e-8).float().sum(dim=-1).mean()
         total_l0 += l0.item()
 
         total += 1
@@ -103,7 +103,7 @@ def valid_sae(
             total_loss += loss.item()
             total_sparsity_loss += sparsity_loss.item()
 
-            l0 = (h > 1e-8).float().sum(dim=-1).mean()
+            l0 = (h.abs() > 1e-8).float().sum(dim=-1).mean()
             total_l0 += l0.item()
 
             total += 1
