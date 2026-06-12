@@ -18,9 +18,9 @@ class MIRDataset(Dataset):
         self.chunk_index = []
 
         for tid in self.loader.track_ids:
-            audio_signal, fs = self.loader.track(tid).audio_mono
+            audio_signal, fs = self.loader.track(tid).audio_stereo
             chunk_size = int(round(self.chunk_duration * fs))
-            n_chunks = int(np.floor(len(audio_signal) / chunk_size)) # discard last chunk
+            n_chunks = int(np.floor(len(audio_signal[0]) / chunk_size)) # discard last chunk
             for i in range(n_chunks):
                 start = i * chunk_size
                 self.chunk_index.append((tid, start, chunk_size))
@@ -36,14 +36,14 @@ class MIRDataset(Dataset):
         )
 
     def __len__(self):
-        return len(self.loader.track_ids)
+        return len(self.chunk_index)
 
     def __getitem__(self, item: int) -> np.ndarray:
         track_id, start, chunk_size = self.chunk_index[item]
         track = self.loader.track(track_id)
-        audio_signal, fs = track.audio_mono
+        audio_signal, fs = track.audio_stereo
 
-        chunk = audio_signal[start:start + chunk_size]
+        chunk = audio_signal[:, start:start + chunk_size]
 
         return chunk.astype(np.float32)
 
