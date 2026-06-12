@@ -58,7 +58,7 @@ def train_sae(
             
         model.train()
         x_hat, h = model(x)
-        sparsity_loss = lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+        sparsity_loss = lamb * torch.linalg.vector_norm(h, ord=1, dim=-1).mean()
         loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
         total_loss += loss.item()
         total_sparsity_loss += sparsity_loss.item()
@@ -93,7 +93,7 @@ def valid_sae(
         model.eval()
         with torch.no_grad():
             x_hat, h = model(x)
-            sparsity_loss = lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+            sparsity_loss = lamb * torch.linalg.vector_norm(h, ord=1, dim=-1).mean()
             loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
             total_loss += loss.item()
             total_sparsity_loss += sparsity_loss.item()
