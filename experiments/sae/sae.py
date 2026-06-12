@@ -34,7 +34,6 @@ class SAE(nn.Module):
         x_hat = self.decode(h)
         return x_hat, h
     
-    
 
 def train_sae(
         model, 
@@ -49,6 +48,7 @@ def train_sae(
     iterator = tqdm(loader, desc=f"E{epoch} Train") if do_tqdm else loader
     total_loss = 0
     total_sparsity_loss = 0
+    total_l0 = 0
     total = 0
 
     for x in iterator:
@@ -62,13 +62,17 @@ def train_sae(
         loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
         total_loss += loss.item()
         total_sparsity_loss += sparsity_loss.item()
+
+        l0 = (h > 1e-8).float().sum(dim=-1).mean()
+        total_l0 += l0.item()
+
         total += 1
 
         optim.zero_grad()
         loss.backward()
         optim.step()
 
-    return total_loss / total, total_sparsity_loss / total
+    return total_loss / total, total_sparsity_loss / total, total_l0 / total
 
 def valid_sae(
         model, 
@@ -82,6 +86,7 @@ def valid_sae(
     iterator = tqdm(loader, desc=f"E{epoch} Valid") if do_tqdm else loader
     total_loss = 0
     total_sparsity_loss = 0
+    total_l0 = 0
     total = 0
 
     for x in iterator:
@@ -97,9 +102,13 @@ def valid_sae(
             loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
             total_loss += loss.item()
             total_sparsity_loss += sparsity_loss.item()
+
+            l0 = (h > 1e-8).float().sum(dim=-1).mean()
+            total_l0 += l0.item()
+
             total += 1
     
-    return total_loss / total, total_sparsity_loss / total
+    return total_loss / total, total_sparsity_loss / total, total_l0 / total
 
 if __name__ == "__main__":
     import os
@@ -113,7 +122,7 @@ if __name__ == "__main__":
     train_configs = {
         "batch_size": 1, 
         "lr": 0.001,
-        "lambda": 0.001,
+        "lambda": 0.01,
         "dataset_name": "orchset"
     }
 
@@ -167,7 +176,7 @@ if __name__ == "__main__":
         return latent[..., 1] # mean only
 
     for epoch in range(start_epoch, start_epoch + EPOCHS):
-        train_loss, train_sparsity_loss = train_sae(
+        train_loss, train_sparsity_loss, train_l0 = train_sae(
             model, 
             train_loader, 
             optim, 
@@ -176,7 +185,7 @@ if __name__ == "__main__":
             epoch=epoch, 
             device=DEVICE
         )
-        valid_loss, valid_sparsity_loss = valid_sae(
+        valid_loss, valid_sparsity_loss, valid_l0 = valid_sae(
             model,
             valid_loader,
             lamb=train_configs["lambda"], 
@@ -188,7 +197,9 @@ if __name__ == "__main__":
             run.log({
                 "train_loss": train_loss, 
                 "train_sparsity_loss": train_sparsity_loss, 
+                "train_l0": train_l0,
                 "valid_loss": valid_loss,
-                "valid_sparsity_loss": valid_sparsity_loss
-                })
+                "valid_sparsity_loss": valid_sparsity_loss,
+                "valid_l0": valid_l0
+            })
         torch.save([model.state_dict(), model.configs, epoch], "experiments/sae/models/sae.pt")
