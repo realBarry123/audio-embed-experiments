@@ -48,6 +48,7 @@ def train_sae(
     ):
     iterator = tqdm(loader, desc=f"E{epoch} Train") if do_tqdm else loader
     total_loss = 0
+    total_sparsity_loss = 0
     total = 0
 
     for x in iterator:
@@ -57,16 +58,17 @@ def train_sae(
             
         model.train()
         x_hat, h = model(x)
-
-        loss = nn.functional.mse_loss(x, x_hat) + lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+        sparsity_loss = lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+        loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
         total_loss += loss.item()
+        total_sparsity_loss += sparsity_loss.item()
         total += 1
 
         optim.zero_grad()
         loss.backward()
         optim.step()
 
-    return total_loss / total
+    return total_loss / total, total_sparsity_loss / total
 
 def valid_sae(
         model, 
@@ -79,6 +81,7 @@ def valid_sae(
     ):
     iterator = tqdm(loader, desc=f"E{epoch} Valid") if do_tqdm else loader
     total_loss = 0
+    total_sparsity_loss = 0
     total = 0
 
     for x in iterator:
@@ -90,11 +93,13 @@ def valid_sae(
         model.eval()
         with torch.no_grad():
             x_hat, h = model(x)
-            loss = nn.functional.mse_loss(x, x_hat) + lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+            sparsity_loss = lamb * torch.linalg.vector_norm(h, dim=-1).mean()
+            loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
             total_loss += loss.item()
+            total_sparsity_loss += sparsity_loss.item()
             total += 1
     
-    return total_loss / total
+    return total_loss / total, total_sparsity_loss / total
 
 if __name__ == "__main__":
     import os
@@ -105,8 +110,14 @@ if __name__ == "__main__":
 
     DO_WANDB = True
 
+    train_configs = {
+        "batch_size": 1, 
+        "lr": 0.001,
+        "lambda": 0.001,
+        "dataset_name": "orchset"
+    }
+
     EPOCHS = 16
-    BATCH_SIZE = 1
     SEED = 123
 
     if not load_dotenv():
@@ -130,13 +141,16 @@ if __name__ == "__main__":
         run = wandb.init(
             entity="barry-and-only-barry",
             project="audio-embed-experiments",
-            config=model.configs,
+            config=dict(model.configs, **train_configs),
         )
     
-    dataset = datasets.MIRDataset("orchset")
-    train_loader, valid_loader = dataset.get_loaders(valid_split=0.2, batch_size=BATCH_SIZE)
+    dataset = datasets.MIRDataset(train_configs["dataset_name"])
+    train_loader, valid_loader = dataset.get_loaders(
+        valid_split=0.2, 
+        batch_size=train_configs["batch_size"]
+    )
 
-    optim = torch.optim.Adam(params=model.parameters(), lr=0.001)
+    optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
     
     diffusion_model = DiffusionModel(
         "stabilityai/stable-audio-open-1.0",
@@ -153,23 +167,28 @@ if __name__ == "__main__":
         return latent[..., 1] # mean only
 
     for epoch in range(start_epoch, start_epoch + EPOCHS):
-        train_loss = train_sae(
+        train_loss, train_sparsity_loss = train_sae(
             model, 
             train_loader, 
             optim, 
-            lamb=0.01, 
+            lamb=train_configs["lambda"], 
             encode_fn=encode_fn, 
             epoch=epoch, 
             device=DEVICE
         )
-        valid_loss = valid_sae(
+        valid_loss, valid_sparsity_loss = valid_sae(
             model,
             valid_loader,
-            lamb=0.01, 
+            lamb=train_configs["lambda"], 
             encode_fn=encode_fn, 
             epoch=epoch, 
             device=DEVICE
         )
         if DO_WANDB: 
-            run.log({"train_loss": train_loss, "valid_loss": valid_loss})
+            run.log({
+                "train_loss": train_loss, 
+                "train_sparsity_loss": train_sparsity_loss, 
+                "valid_loss": valid_loss,
+                "valid_sparsity_loss": valid_sparsity_loss
+                })
         torch.save([model.state_dict(), model.configs, epoch], "experiments/sae/models/sae.pt")
