@@ -10,6 +10,7 @@ class MIRDataset(Dataset):
     Adapted from https://mirdata.readthedocs.io/en/stable/source/tutorial.html 06-09-2026
     """
     def __init__(self, dataset_name: str, chunk_duration=5.0):
+        self.dataset_name = dataset_name
         self.loader = mirdata.initialize(dataset_name)
         self.loader.download()
         self.loader.validate()
@@ -45,7 +46,7 @@ class MIRDataset(Dataset):
 
         chunk = audio_signal[:, start:start + chunk_size]
 
-        return chunk.astype(np.float32)
+        return chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
 
     def get_loaders(self, valid_split, batch_size, seed=0):
         """
@@ -64,3 +65,13 @@ class MIRDataset(Dataset):
         valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
 
         return train_loader, valid_loader
+
+if __name__ == "__main__":
+    import soundfile as sf
+    dataset = MIRDataset("orchset")
+    train_loader, valid_loader = dataset.get_loaders(
+        valid_split=0.2, 
+        batch_size=1
+    )
+    sf.write(f"test_{dataset.dataset_name}.wav")
+    
