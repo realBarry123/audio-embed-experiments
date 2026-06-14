@@ -73,5 +73,5 @@ if __name__ == "__main__":
         valid_split=0.2, 
         batch_size=1
     )
-    sf.write(f"test_{dataset.dataset_name}.wav")
+    sf.write(f"test_{dataset.dataset_name}.wav", valid_loader[0])
     
