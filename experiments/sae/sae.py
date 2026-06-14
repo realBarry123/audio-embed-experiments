@@ -14,7 +14,7 @@ class SAE(nn.Module):
             "do_norm": do_norm
         }
         self.encoder_linear = nn.Linear(latent_dim, feature_dim, bias=True)
-        self.decoder_linear = nn.Linear(feature_dim, latent_dim, bias=True)
+        self.decode = nn.Linear(feature_dim, latent_dim, bias=True)
         self.relu = nn.ReLU()
         self.norm = nn.modules.normalization.RMSNorm([feature_dim,])
     
@@ -22,11 +22,6 @@ class SAE(nn.Module):
         x = self.encoder_linear(x)
         if self.configs["do_relu"]: x = self.relu(x)
         if self.configs["do_norm"]: x = self.norm(x)
-        return x
-    
-    def decode(self, x):
-        x = self.decoder_linear(x)
-        if self.configs["do_relu"]: x = self.relu(x)
         return x
 
     def forward(self, x):
