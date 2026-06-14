@@ -1,34 +1,13 @@
+import os
 import torch
 from torch import nn
 from tqdm import tqdm
+from nnsight.modeling.diffusion import DiffusionModel
+from dotenv import load_dotenv
+from einops import rearrange
+import wandb
 
-from audembed import datasets
-
-class SAE(nn.Module):
-    def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True):
-        super().__init__()
-        self.configs = {
-            "latent_dim": latent_dim,
-            "feature_dim": feature_dim,
-            "do_relu": do_relu,
-            "do_norm": do_norm
-        }
-        self.encoder_linear = nn.Linear(latent_dim, feature_dim, bias=True)
-        self.decode = nn.Linear(feature_dim, latent_dim, bias=True)
-        self.relu = nn.ReLU()
-        self.norm = nn.modules.normalization.RMSNorm([feature_dim,])
-    
-    def encode(self, x):
-        x = self.encoder_linear(x)
-        if self.configs["do_relu"]: x = self.relu(x)
-        if self.configs["do_norm"]: x = self.norm(x)
-        return x
-
-    def forward(self, x):
-        h = self.encode(x)
-        x_hat = self.decode(h)
-        return x_hat, h
-    
+from audembed import datasets, models
 
 def train_sae(
         model, 
@@ -46,11 +25,12 @@ def train_sae(
     total_l0 = 0
     total = 0
 
-    for x in iterator:
+    for x in iterator: # x: (batch, channel=2, sample)
         x = x.to(device)
         if encode_fn is not None: 
             x = encode_fn(x).detach()
-            
+        
+        # x: (batch, frame, latent_dim=64)
         model.train()
         x_hat, h = model(x)
         sparsity_loss = lamb * torch.linalg.vector_norm(h, ord=1, dim=-1).mean()
@@ -85,8 +65,8 @@ def valid_sae(
     total = 0
 
     for x in iterator:
-        print(x.shape)
         x = x.to(device)
+
         if encode_fn is not None: 
             x = encode_fn(x).detach()
 
@@ -105,96 +85,90 @@ def valid_sae(
     
     return total_loss / total, total_sparsity_loss / total, total_l0 / total
 
-if __name__ == "__main__":
-    import os
-    from nnsight.modeling.diffusion import DiffusionModel
-    from dotenv import load_dotenv
-    from einops import rearrange
-    import wandb
 
-    DO_WANDB = True
+DO_WANDB = True
 
-    train_configs = {
-        "batch_size": 1, 
-        "lr": 0.001,
-        "lambda": 0.01,
-        "dataset_name": "orchset"
-    }
+train_configs = {
+    "batch_size": 1, 
+    "lr": 0.001,
+    "lambda": 1e-4,
+    "dataset_name": "orchset"
+}
 
-    EPOCHS = 16
-    SEED = 123
+EPOCHS = 16
+SEED = 123
 
-    if not load_dotenv():
-        raise SystemExit("No .env file found, please make one in the root directory")
+if not load_dotenv():
+    raise SystemExit("No .env file found, please make one in the root directory")
 
-    CACHE_PATH = os.getenv("CACHE_PATH")
-    DEVICE = os.getenv("DEVICE")
+CACHE_PATH = os.getenv("CACHE_PATH")
+DEVICE = os.getenv("DEVICE")
 
-    if not CACHE_PATH or not DEVICE:
-        raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
+if not CACHE_PATH or not DEVICE:
+    raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
 
-    try: 
-        state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
-        model = SAE(**configs).to(DEVICE)
-        model.load_state_dict(state_dict)
-    except FileNotFoundError:
-        start_epoch = 0
-        model = SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
-    
-    if DO_WANDB:
-        run = wandb.init(
-            entity="barry-and-only-barry",
-            project="audio-embed-experiments",
-            config=dict(model.configs, **train_configs),
-        )
-    
-    dataset = datasets.MIRDataset(train_configs["dataset_name"])
-    train_loader, valid_loader = dataset.get_loaders(
-        valid_split=0.2, 
-        batch_size=train_configs["batch_size"]
+try: 
+    state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
+    model = models.SAE(**configs).to(DEVICE)
+    model.load_state_dict(state_dict)
+except FileNotFoundError:
+    start_epoch = 0
+    model = models.SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
+
+if DO_WANDB:
+    run = wandb.init(
+        entity="barry-and-only-barry",
+        project="audio-embed-experiments",
+        config=dict(model.configs, **train_configs),
     )
 
-    optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
-    
-    diffusion_model = DiffusionModel(
-        "stabilityai/stable-audio-open-1.0",
-        torch_dtype=torch.float32,
-        cache_dir=CACHE_PATH,
-        device_map=DEVICE
+dataset = datasets.MIRDataset(train_configs["dataset_name"])
+train_loader, valid_loader = dataset.get_loaders(
+    valid_split=0.2, 
+    batch_size=train_configs["batch_size"]
+)
+
+optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
+
+diffusion_model = DiffusionModel(
+    "stabilityai/stable-audio-open-1.0",
+    torch_dtype=torch.float32,
+    cache_dir=CACHE_PATH,
+    device_map=DEVICE
+)
+
+def encode_fn(x):
+    with diffusion_model.trace("_"):
+        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
+
+    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)
+    return latent[..., 1] # (B, F, C=64)
+
+for epoch in range(start_epoch, start_epoch + EPOCHS):
+    train_loss, train_sparsity_loss, train_l0 = train_sae(
+        model, 
+        train_loader, 
+        optim, 
+        lamb=train_configs["lambda"], 
+        encode_fn=encode_fn, 
+        epoch=epoch, 
+        device=DEVICE
     )
-
-    def encode_fn(x):
-        with diffusion_model.trace("_"):
-            latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
-
-        latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)
-        return latent[..., 1] # mean only
-
-    for epoch in range(start_epoch, start_epoch + EPOCHS):
-        train_loss, train_sparsity_loss, train_l0 = train_sae(
-            model, 
-            train_loader, 
-            optim, 
-            lamb=train_configs["lambda"], 
-            encode_fn=encode_fn, 
-            epoch=epoch, 
-            device=DEVICE
-        )
-        valid_loss, valid_sparsity_loss, valid_l0 = valid_sae(
-            model,
-            valid_loader,
-            lamb=train_configs["lambda"], 
-            encode_fn=encode_fn, 
-            epoch=epoch, 
-            device=DEVICE
-        )
-        if DO_WANDB: 
-            run.log({
-                "train_loss": train_loss, 
-                "train_sparsity_loss": train_sparsity_loss, 
-                "train_l0": train_l0,
-                "valid_loss": valid_loss,
-                "valid_sparsity_loss": valid_sparsity_loss,
-                "valid_l0": valid_l0
-            })
-        torch.save([model.state_dict(), model.configs, epoch], "experiments/sae/models/sae.pt")
+    valid_loss, valid_sparsity_loss, valid_l0 = valid_sae(
+        model,
+        valid_loader,
+        lamb=train_configs["lambda"], 
+        encode_fn=encode_fn, 
+        epoch=epoch, 
+        device=DEVICE
+    )
+    if DO_WANDB: 
+        run.log({
+            "train_loss": train_loss, 
+            "train_sparsity_loss": train_sparsity_loss, 
+            "train_l0": train_l0,
+            "valid_loss": valid_loss,
+            "valid_sparsity_loss": valid_sparsity_loss,
+            "valid_l0": valid_l0
+        })
+    torch.save([model.state_dict(), model.configs, epoch], "experiments/sae/models/sae.pt")
