@@ -32,7 +32,7 @@ for x in valid_loader:
     audio = x
     break
 
-sf.write(f"experiments/sae/results/{dataset.dataset_name}_sample.wav", audio[0], 44100)
+sf.write(f"experiments/sae/results/{dataset.dataset_name}_sample.wav", audio[0].T, 44100)
 
 diffusion_model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
@@ -50,7 +50,16 @@ def encode_fn(x):
 
 vae_latent = encode_fn(audio.to(DEVICE))
 
-sae_latent = sae.encode(vae_latent)[0][0].T # (frame, feature_dim=2048)
+sae_latent = sae.encode(vae_latent)[0].T # (frame, feature_dim=2048)
 print(sae_latent.shape)
 
 torch.save(sae_latent, f"experiments/sae/results/{dataset.dataset_name}_sae_latent.pt")
+
+sae_latent = sae_latent.T.unsqueeze(0) # (batch=1, frame, latent_dim=64)
+sae_latent = rearrange(sae_latent, "b f c -> b c f")
+vae_latent_recon = sae.decode(sae_latent) 
+
+with diffusion_model.trace("_"):
+    audio_recon = diffusion_model.vae.decoder(vae_latent_recon).save()
+
+sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon.wav", audio[0].T, 44100)
