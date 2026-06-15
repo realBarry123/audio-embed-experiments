@@ -22,10 +22,10 @@ state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
 sae = models.SAE(**configs).to(DEVICE)
 sae.load_state_dict(state_dict)
 
-dataset = datasets.MIRDataset("orchset")
+dataset = datasets.MIRDataset("orchset", chunk_duration=1.0)
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
-    batch_size=1
+    batch_size=1,
 )
 
 for x in valid_loader:
@@ -40,26 +40,39 @@ diffusion_model = DiffusionModel(
     cache_dir=CACHE_PATH,
     device_map=DEVICE
 )
+# print(diffusion_model.vae.config); exit()
 
-def encode_fn(x):
+def vae_encode(audio):
     with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
+        latent = diffusion_model.vae.encode(audio).latent_dist.mean.save() # [batch, param*channel, frame]
+    return rearrange(latent, "b c f -> b f c")
 
-    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)
-    return latent[..., 1] # (B, F, C=64)
+def vae_decode(latent):
+    latent = rearrange(latent, "b f c -> b c f")# * diffusion_model.vae.bottleneck.scale
+    with diffusion_model.trace("_"):
+        audio = diffusion_model.vae.decode(latent).sample.save()
+    return audio
 
-vae_latent = encode_fn(audio.to(DEVICE))
+vae_latent = vae_encode(audio.to(DEVICE))
 
-sae_latent = sae.encode(vae_latent)[0].T # (frame, feature_dim=2048)
-print(sae_latent.shape)
+del audio
+torch.cuda.empty_cache()
+
+with torch.no_grad():
+    sae_latent = sae.encode(vae_latent)[0].T # (frame, feature_dim=2048)
 
 torch.save(sae_latent, f"experiments/sae/results/{dataset.dataset_name}_sae_latent.pt")
 
-sae_latent = sae_latent.T.unsqueeze(0) # (batch=1, frame, latent_dim=64)
-sae_latent = rearrange(sae_latent, "b f c -> b c f")
-vae_latent_recon = sae.decode(sae_latent) 
+with torch.no_grad():
+    vae_latent_recon = sae.decode(sae_latent.T.unsqueeze(0)) # (batch=1, frame, latent_dim=64)
 
-with diffusion_model.trace("_"):
-    audio_recon = diffusion_model.vae.decoder(vae_latent_recon).save()
+audio_recon = vae_decode(vae_latent_recon).cpu()
+audio_recon = audio_recon / audio_recon.abs().max()
+sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon.wav", audio_recon[0].T.detach(), 44100)
 
-sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon.wav", audio[0].T, 44100)
+del audio_recon
+torch.cuda.empty_cache()
+
+audio_recon_from_vae = vae_decode(vae_latent).cpu()
+audio_recon_from_vae = audio_recon_from_vae / audio_recon_from_vae.abs().max()
+sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon_from_vae.wav", audio_recon_from_vae[0].T.detach().cpu(), 44100)
