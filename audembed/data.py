@@ -113,26 +113,23 @@ def plot_latent(x, title=None):
 
     return ax
 
-def plot_heatmap_2d(x, title=None, cmap="viridis"):
+def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis"):
     if x.dim() != 2:
         raise ValueError(f"plot_heatmap_2d expects input of shape (t, d), got {tuple(x.shape)}")
 
     # Transpose so imshow's x-axis corresponds to the 0th dimension of the input
-    data = x.cpu().numpy().T  # shape -> (d, t)
+    data = x.detach().cpu().numpy()  # shape -> (d, t)
 
     fig, ax = plt.subplots()
-    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
-    ax.set_xlabel("dim 0 (t)")
-    ax.set_ylabel("dim 1 (d)")
+    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=None, vmax=None)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     if title is not None:
         ax.set_title(title)
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("value")
     plt.show()
     return ax
-
-def plot_weight(x, title=None):
-    raise NotImplementedError()
 
 if __name__ == "__main__":
     latents = torch.load("experiments/readingframe/results/a.pt", map_location=torch.device('cpu'))

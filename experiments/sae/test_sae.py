@@ -28,8 +28,11 @@ train_loader, valid_loader = dataset.get_loaders(
     batch_size=1
 )
 
-audio = valid_loader[0]
-sf.write(f"experiments/sae/results/test_{dataset.dataset_name}.wav", audio)
+for x in valid_loader:
+    audio = x
+    break
+
+sf.write(f"experiments/sae/results/{dataset.dataset_name}_sample.wav", audio[0], 44100)
 
 diffusion_model = DiffusionModel(
     "stabilityai/stable-audio-open-1.0",
@@ -45,9 +48,9 @@ def encode_fn(x):
     latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)
     return latent[..., 1] # (B, F, C=64)
 
-vae_latent = encode_fn(audio)
+vae_latent = encode_fn(audio.to(DEVICE))
 
-sae_latent = sae(vae_latent).unsqueeze(0) # (frame, feature_dim=2048)
+sae_latent = sae.encode(vae_latent)[0][0].T # (frame, feature_dim=2048)
 print(sae_latent.shape)
 
-torch.save(sae_latent, "experiments/sae/results/{dataset.dataset_name}_sae_latent.pt")
+torch.save(sae_latent, f"experiments/sae/results/{dataset.dataset_name}_sae_latent.pt")
