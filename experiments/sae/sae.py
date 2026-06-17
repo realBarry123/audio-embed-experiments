@@ -137,7 +137,7 @@ diffusion_model = DiffusionModel(
     device_map=DEVICE
 )
 
-def encode_fn(audio):
+def vae_encode(audio):
     with diffusion_model.trace("_"):
         latent = diffusion_model.vae.encode(audio).latent_dist.mean.save()
     return rearrange(latent, "b c f -> b f c")
@@ -148,7 +148,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         train_loader, 
         optim, 
         lamb=train_configs["lambda"], 
-        encode_fn=encode_fn, 
+        encode_fn=vae_encode, 
         epoch=epoch, 
         device=DEVICE
     )
@@ -156,7 +156,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         model,
         valid_loader,
         lamb=train_configs["lambda"], 
-        encode_fn=encode_fn, 
+        encode_fn=vae_encode, 
         epoch=epoch, 
         device=DEVICE
     )

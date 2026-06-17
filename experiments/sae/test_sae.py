@@ -40,15 +40,14 @@ diffusion_model = DiffusionModel(
     cache_dir=CACHE_PATH,
     device_map=DEVICE
 )
-# print(diffusion_model.vae.config); exit()
 
 def vae_encode(audio):
     with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encode(audio).latent_dist.mean.save() # [batch, param*channel, frame]
+        latent = diffusion_model.vae.encode(audio).latent_dist.mean.save()
     return rearrange(latent, "b c f -> b f c")
 
 def vae_decode(latent):
-    latent = rearrange(latent, "b f c -> b c f")# * diffusion_model.vae.bottleneck.scale
+    latent = rearrange(latent, "b f c -> b c f")
     with diffusion_model.trace("_"):
         audio = diffusion_model.vae.decode(latent).sample.save()
     return audio

@@ -42,7 +42,7 @@ def train_probe(
 
     return total_loss / total
 
-def encode_fn(x):
+def vae_encode(x):
     with diffusion_model.trace("_"):
         latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
 
@@ -79,10 +79,8 @@ def valid_probe(
     return total_loss / total
 
 def to_spectrogram(x):
-    spec = T.Spectrogram(258)(x)
+    spec = T.Spectrogram(n_fft=258)(x)
     spec = rearrange(spec, "batch freq (frame time) -> batch frame time freq", time=2048)
-    spec = spec.mean(dim=2, keepdim=False) # batch frame freq
-    return spec
 
 DO_WANDB = True
 
@@ -114,7 +112,7 @@ try:
     probe.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    probe = models.Probe(2048, 128).to(DEVICE)
+    probe = models.FeatureProbe(2048, 128).to(DEVICE)
 
 if DO_WANDB:
     run = wandb.init(
@@ -144,7 +142,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         train_loader, 
         optim, 
         y_fn=to_spectrogram,
-        encode_fn=encode_fn, 
+        encode_fn=vae_encode, 
         epoch=epoch, 
         device=DEVICE
     )
@@ -152,7 +150,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         probe,
         valid_loader,
         y_fn=to_spectrogram, 
-        encode_fn=encode_fn, 
+        encode_fn=vae_encode, 
         epoch=epoch, 
         device=DEVICE
     )
