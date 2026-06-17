@@ -113,7 +113,7 @@ def plot_latent(x, title=None):
 
     return ax
 
-def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis"):
+def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis", save_file=None):
     if x.dim() != 2:
         raise ValueError(f"plot_heatmap_2d expects input of shape (t, d), got {tuple(x.shape)}")
 
@@ -128,8 +128,15 @@ def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis"):
         ax.set_title(title)
     cbar = fig.colorbar(im, ax=ax)
     cbar.set_label("value")
+    if save_file is not None:
+        plt.savefig(save_file)
     plt.show()
     return ax
+
+def sort_sae_latents(x):
+    activations = x.sum(dim=1, keepdim=False)
+    index = activations.argsort(dim=0)
+    return x[index]
 
 if __name__ == "__main__":
     latents = torch.load("experiments/readingframe/results/a.pt", map_location=torch.device('cpu'))
