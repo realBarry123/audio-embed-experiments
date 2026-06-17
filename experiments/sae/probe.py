@@ -81,6 +81,8 @@ def valid_probe(
 def to_spectrogram(x):
     spec = T.Spectrogram(n_fft=258)(x)
     spec = rearrange(spec, "batch freq (frame time) -> batch frame time freq", time=2048)
+    spec = spec.mean(dim=2, keepdim=False)
+    return spec  # (batch, frame, freq=128)
 
 DO_WANDB = True
 
