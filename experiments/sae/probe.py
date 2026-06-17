@@ -10,6 +10,15 @@ import wandb
 
 from audembed import datasets, models
 
+if not load_dotenv():
+    raise SystemExit("No .env file found, please make one in the root directory")
+
+CACHE_PATH = os.getenv("CACHE_PATH")
+DEVICE = os.getenv("DEVICE")
+
+if not CACHE_PATH or not DEVICE:
+    raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
+
 def train_probe(
         model, 
         loader, 
@@ -32,6 +41,7 @@ def train_probe(
             
         model.train()
         y_hat = model(x)
+        # print("y (spectrogram):", y.shape, "   y_hat (latent):", y_hat.shape)
         loss = nn.functional.mse_loss(y, y_hat)
         total_loss += loss.item()
         total += 1
@@ -41,13 +51,6 @@ def train_probe(
         optim.step()
 
     return total_loss / total
-
-def vae_encode(x):
-    with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
-
-    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)
-    return latent[..., 1] # (B, F, C=64)
 
 def valid_probe(
         model, 
@@ -78,9 +81,27 @@ def valid_probe(
 
     return total_loss / total
 
+state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
+sae = models.SAE(**configs).to(DEVICE)
+sae.load_state_dict(state_dict)
+
+def encode_fn(x):
+    with diffusion_model.trace("_"):
+        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
+
+    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
+    with torch.no_grad():
+        features = sae.encode(latent).detach()
+    return features
+
+spectrogram = T.Spectrogram(n_fft=254, hop_length=127).to(DEVICE)
+
 def to_spectrogram(x):
-    spec = T.Spectrogram(n_fft=258)(x)
-    spec = rearrange(spec, "batch freq (frame time) -> batch frame time freq", time=2048)
+    spec = spectrogram(x)
+    spec = spec.mean(dim=1, keepdim=False) # remove channel dimension
+    spec = spec[..., :-(spec.shape[-1] % 16)]  # trim to 1728
+    spec = rearrange(spec, "batch freq (frame time) -> batch frame time freq", time=2048//127)
+    spec = spec[:, :-1] # trim last frame
     spec = spec.mean(dim=2, keepdim=False)
     return spec  # (batch, frame, freq=128)
 
@@ -94,19 +115,6 @@ train_configs = {
 
 EPOCHS = 16
 SEED = 123
-
-if not load_dotenv():
-    raise SystemExit("No .env file found, please make one in the root directory")
-
-CACHE_PATH = os.getenv("CACHE_PATH")
-DEVICE = os.getenv("DEVICE")
-
-if not CACHE_PATH or not DEVICE:
-    raise ValueError("Missing required environment variables: CACHE_PATH, DEVICE")
-
-state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
-sae = models.SAE(**configs).to(DEVICE)
-sae.load_state_dict(state_dict)
 
 try: 
     state_dict, configs, start_epoch = torch.load("experiments/sae/models/probe.pt")
@@ -144,7 +152,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         train_loader, 
         optim, 
         y_fn=to_spectrogram,
-        encode_fn=vae_encode, 
+        encode_fn=encode_fn, 
         epoch=epoch, 
         device=DEVICE
     )
@@ -152,7 +160,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         probe,
         valid_loader,
         y_fn=to_spectrogram, 
-        encode_fn=vae_encode, 
+        encode_fn=encode_fn, 
         epoch=epoch, 
         device=DEVICE
     )

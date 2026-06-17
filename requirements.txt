@@ -4,6 +4,7 @@ nnsight
 python-dotenv
 soundfile
 torch
+torchaudio
 git+https://github.com/realBarry123/torchsde.git
 torchvision
 transformers

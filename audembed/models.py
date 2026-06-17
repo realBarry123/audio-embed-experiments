@@ -27,6 +27,7 @@ class SAE(nn.Module):
    
 class FeatureProbe(nn.Module):
     def __init__(self, feature_dim, logit_dim):
+        super().__init__()
         self.configs = {
             "feature_dim": feature_dim,
             "logit_dim": logit_dim
