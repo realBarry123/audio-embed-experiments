@@ -24,7 +24,7 @@ def train_probe(
         loader, 
         optim, 
         y_fn,
-        encode_fn=None, 
+        encode_fn, 
         epoch=0, 
         device="cuda", 
         do_tqdm=True
@@ -35,13 +35,11 @@ def train_probe(
 
     for x in iterator:
         x = x.to(device)
-        if encode_fn is not None: 
-            x = encode_fn(x).detach()
-
-        y = y_fn(x, target_frames=x.shape[1])
-            
+        x_feat = encode_fn(x).detach()
+        y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
+        
         model.train()
-        y_hat = model(x)
+        y_hat = model(x_feat)
         # print("y (spectrogram):", y.shape, "   y_hat (latent):", y_hat.shape)
         loss = nn.functional.mse_loss(y, y_hat)
         total_loss += loss.item()
@@ -57,7 +55,7 @@ def valid_probe(
         model, 
         loader, 
         y_fn,
-        encode_fn=None, 
+        encode_fn, 
         epoch=0, 
         device="cuda", 
         do_tqdm=True
@@ -70,13 +68,11 @@ def valid_probe(
     with torch.no_grad():
         for x in iterator:
             x = x.to(device)
-            if encode_fn is not None: 
-                x = encode_fn(x).detach()
-
-            y = y_fn(x, target_frames=x.shape[1])
-                
+            x_feat = encode_fn(x).detach()
+            y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
+            
             model.train()
-            y_hat = model(x)
+            y_hat = model(x_feat)
             loss = nn.functional.mse_loss(y, y_hat)
             total_loss += loss.item()
             total += 1
@@ -98,32 +94,44 @@ def encode_fn(x):
 
 spectrogram = T.Spectrogram(n_fft=254, hop_length=127).to(DEVICE)
 
-def to_spectrogram(x, target_frames):
-    """
-    GPT-5 mini 2026-06-21
-    """
+def to_spectrogram(x, target_frames, target_bins, return_complex=False):
+    
+    def _next_pow2(n: int) -> int:
+        p = 1
+        while p < n:
+            p <<= 1
+        return p
+
     if x.dim() == 3:
         waveform = x.mean(dim=1)  # (batch, time)
     else:
         waveform = x  # (batch, time)
 
     B, T = waveform.shape
-    n_fft = 2048
-    # choose hop so that STFT produces ~target_frames frames:
+
     if target_frames <= 1:
         raise ValueError("target_frames must be at least 1")
-    else:
-        hop_length = max(1, (T - n_fft) // (target_frames - 1))
+    if target_bins < 2:
+        raise ValueError("target_bins must be >= 2")
+        
+    # bins = n_fft // 2 + 1  =>  n_fft = 2 * (bins - 1)
+    n_fft = _next_pow2(2 * (target_bins - 1))
+    n_fft = max(2, n_fft)
+    
+    hop_length = max(1, (T - n_fft) // (target_frames - 1))
 
     spec = torch.stft(
         waveform,
         n_fft=n_fft,
         hop_length=hop_length,
         win_length=n_fft,
-        return_complex=True,
+        return_complex=return_complex,
         center=True,
     )
-    mag = rearrange(spec.abs(), "barch freq frames -> batch frames freq") # .contiguous()
+    
+    mag = rearrange(spec.abs(), "batch freq frames complex -> batch frames freq complex")
+    mag = mag[..., :target_bins, 0]
+    
     return mag
 
 DO_WANDB = True
