@@ -35,9 +35,10 @@ def train_probe(
 
     for x in iterator:
         x = x.to(device)
-        y = y_fn(x)
         if encode_fn is not None: 
             x = encode_fn(x).detach()
+
+        y = y_fn(x, target_frames=x.shape[1])
             
         model.train()
         y_hat = model(x)
@@ -69,9 +70,10 @@ def valid_probe(
     with torch.no_grad():
         for x in iterator:
             x = x.to(device)
-            y = y_fn(x)
             if encode_fn is not None: 
                 x = encode_fn(x).detach()
+
+            y = y_fn(x, target_frames=x.shape[1])
                 
             model.train()
             y_hat = model(x)
@@ -96,14 +98,33 @@ def encode_fn(x):
 
 spectrogram = T.Spectrogram(n_fft=254, hop_length=127).to(DEVICE)
 
-def to_spectrogram(x):
-    spec = spectrogram(x)
-    spec = spec.mean(dim=1, keepdim=False) # remove channel dimension
-    spec = spec[..., :-(spec.shape[-1] % 16)]  # trim to 1728
-    spec = rearrange(spec, "batch freq (frame time) -> batch frame time freq", time=2048//127)
-    spec = spec[:, :-1] # trim last frame
-    spec = spec.mean(dim=2, keepdim=False)
-    return spec  # (batch, frame, freq=128)
+def to_spectrogram(x, target_frames):
+    """
+    GPT-5 mini 2026-06-21
+    """
+    if x.dim() == 3:
+        waveform = x.mean(dim=1)  # (batch, time)
+    else:
+        waveform = x  # (batch, time)
+
+    B, T = waveform.shape
+    n_fft = 2048
+    # choose hop so that STFT produces ~target_frames frames:
+    if target_frames <= 1:
+        raise ValueError("target_frames must be at least 1")
+    else:
+        hop_length = max(1, (T - n_fft) // (target_frames - 1))
+
+    spec = torch.stft(
+        waveform,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        win_length=n_fft,
+        return_complex=True,
+        center=True,
+    )
+    mag = rearrange(spec.abs(), "barch freq frames -> batch frames freq") # .contiguous()
+    return mag
 
 DO_WANDB = True
 
