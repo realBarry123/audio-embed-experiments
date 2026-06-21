@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from einops import rearrange
 import wandb
 
-from audembed import datasets, models
+from audembed import datasets, models, audio
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -33,12 +33,13 @@ def train_probe(
     total_loss = 0
     total = 0
 
+    model.train()
+
     for x in iterator:
         x = x.to(device)
         x_feat = encode_fn(x).detach()
         y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
         
-        model.train()
         y_hat = model(x_feat)
         # print("y (spectrogram):", y.shape, "   y_hat (latent):", y_hat.shape)
         loss = nn.functional.mse_loss(y, y_hat)
@@ -71,7 +72,6 @@ def valid_probe(
             x_feat = encode_fn(x).detach()
             y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
             
-            model.train()
             y_hat = model(x_feat)
             loss = nn.functional.mse_loss(y, y_hat)
             total_loss += loss.item()
@@ -91,48 +91,6 @@ def encode_fn(x):
     with torch.no_grad():
         features = sae.encode(latent).detach()
     return features
-
-spectrogram = T.Spectrogram(n_fft=254, hop_length=127).to(DEVICE)
-
-def to_spectrogram(x, target_frames, target_bins, return_complex=False):
-    
-    def _next_pow2(n: int) -> int:
-        p = 1
-        while p < n:
-            p <<= 1
-        return p
-
-    if x.dim() == 3:
-        waveform = x.mean(dim=1)  # (batch, time)
-    else:
-        waveform = x  # (batch, time)
-
-    B, T = waveform.shape
-
-    if target_frames <= 1:
-        raise ValueError("target_frames must be at least 1")
-    if target_bins < 2:
-        raise ValueError("target_bins must be >= 2")
-        
-    # bins = n_fft // 2 + 1  =>  n_fft = 2 * (bins - 1)
-    n_fft = _next_pow2(2 * (target_bins - 1))
-    n_fft = max(2, n_fft)
-    
-    hop_length = max(1, (T - n_fft) // (target_frames - 1))
-
-    spec = torch.stft(
-        waveform,
-        n_fft=n_fft,
-        hop_length=hop_length,
-        win_length=n_fft,
-        return_complex=return_complex,
-        center=True,
-    )
-    
-    mag = rearrange(spec.abs(), "batch freq frames complex -> batch frames freq complex")
-    mag = mag[..., :target_bins, 0]
-    
-    return mag
 
 DO_WANDB = True
 
@@ -180,7 +138,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         probe, 
         train_loader, 
         optim, 
-        y_fn=to_spectrogram,
+        y_fn=audio.to_spectrogram,
         encode_fn=encode_fn, 
         epoch=epoch, 
         device=DEVICE
@@ -188,7 +146,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
     valid_loss = valid_probe(
         probe,
         valid_loader,
-        y_fn=to_spectrogram, 
+        y_fn=audio.to_spectrogram, 
         encode_fn=encode_fn, 
         epoch=epoch, 
         device=DEVICE
