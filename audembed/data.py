@@ -113,7 +113,7 @@ def plot_latent(x, title=None):
 
     return ax
 
-def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis", save_file=None):
+def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis", vmin=None, vmax=None, save_file=None):
     if x.dim() != 2:
         raise ValueError(f"plot_heatmap_2d expects input of shape (t, d), got {tuple(x.shape)}")
 
@@ -121,7 +121,7 @@ def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis", save_
     data = x.detach().cpu().numpy()  # shape -> (d, t)
 
     fig, ax = plt.subplots()
-    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=None, vmax=None)
+    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if title is not None:
