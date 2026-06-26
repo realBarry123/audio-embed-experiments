@@ -167,4 +167,4 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
             "train_loss": train_loss, 
             "valid_loss": valid_loss,
         })
-    torch.save([probe.state_dict(), probe.configs, epoch], "experiments/sae/models/probe.pt")
+    torch.save([probe.state_dict(), probe.configs, epoch+1], "experiments/sae/models/probe.pt")
