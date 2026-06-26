@@ -109,7 +109,7 @@ try:
     probe.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    probe = models.FeatureProbe(2048, 128).to(DEVICE)
+    probe = models.FeatureProbe(2048, 128, bias=False).to(DEVICE)
 
 if DO_WANDB:
     run = wandb.init(

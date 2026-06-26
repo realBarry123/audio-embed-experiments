@@ -26,13 +26,14 @@ class SAE(nn.Module):
         return x_hat, h
    
 class FeatureProbe(nn.Module):
-    def __init__(self, feature_dim, logit_dim):
+    def __init__(self, feature_dim, logit_dim, bias):
         super().__init__()
         self.configs = {
             "feature_dim": feature_dim,
-            "logit_dim": logit_dim
+            "logit_dim": logit_dim,
+            "bias": bias
         }
-        self.linear = nn.Linear(feature_dim, logit_dim, bias=True)
+        self.linear = nn.Linear(feature_dim, logit_dim, bias=bias)
     
     def forward(self, x):
         return self.linear(x)
