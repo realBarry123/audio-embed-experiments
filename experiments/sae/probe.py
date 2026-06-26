@@ -133,6 +133,17 @@ diffusion_model = DiffusionModel(
     device_map=DEVICE
 )
 
+if start_epoch == 0: 
+    valid_loss = valid_probe(
+        probe,
+        valid_loader,
+        y_fn=audio.to_spectrogram, 
+        encode_fn=encode_fn, 
+        epoch=-1,
+        device=DEVICE
+    )
+    print("Initial validation loss:", valid_loss)
+
 for epoch in range(start_epoch, start_epoch + EPOCHS):
     train_loss = train_probe(
         probe, 

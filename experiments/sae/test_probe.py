@@ -51,23 +51,19 @@ def encode(x):
 
 iterator = tqdm(valid_loader)
 
-total_squared_error = torch.zeros(128)
-total_y = torch.zeros(128)
-total_y_sq = torch.zeros(128)
+total_squared_error = torch.zeros(128).to(DEVICE)
+total_y = torch.zeros(128).to(DEVICE)
+total_y_sq = torch.zeros(128).to(DEVICE)
 count = 0
 
 probe.eval()
 with torch.no_grad():
     for x in iterator:
         x = x.to(DEVICE)
-
-        x = encode(x).detach()
-
-        x = x.to(DEVICE)
         x_feat = encode(x).detach()
-        y = audio.to_spectrogram(x, target_frames=x_feat.shape[1], target_bins=128)
+        y = audio.to_spectrogram(x, target_frames=x_feat.shape[1], target_bins=128).squeeze(0)
         
-        y_hat = probe(x_feat).unsqueeze(0) # (frames, bins)
+        y_hat = probe(x_feat).squeeze(0) # (frames, bins)
         squared_error = (y - y_hat) ** 2
 
         total_squared_error += squared_error.mean(dim=0)
@@ -80,4 +76,4 @@ var_y = total_y_sq / count - mean_y ** 2
 mse = total_squared_error / count
 
 r2 = 1 - mse / (var_y + 1e-8)
-torch.save(r2, "experiments/sae/results/probe_r2.pt")
+torch.save(r2.cpu(), "experiments/sae/results/probe_r2.pt")
