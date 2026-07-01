@@ -1,4 +1,6 @@
+import torch
 from torch import nn
+from einops import rearrange
 
 class SAE(nn.Module):
     def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True):
@@ -37,3 +39,26 @@ class FeatureProbe(nn.Module):
     
     def forward(self, x):
         return self.linear(x)
+    
+
+from nnsight.modeling.diffusion import DiffusionModel
+
+class VAEWrapper(nn.Module):
+    def __init__(self, cache_path, device):
+        self.model = DiffusionModel(
+            "stabilityai/stable-audio-open-1.0",
+            torch_dtype=torch.float32,
+            cache_dir=cache_path,
+            device_map=device
+        )
+
+    def encode(self, audio):
+        with self.model.trace("_"):
+            latent = self.model.vae.encode(audio).latent_dist.mean.save()
+        return rearrange(latent, "b c f -> b f c")
+
+    def decode(self, latent):
+        latent = rearrange(latent, "b f c -> b c f")
+        with self.model.trace("_"):
+            audio = self.model.vae.decode(latent).sample.save()
+        return audio
