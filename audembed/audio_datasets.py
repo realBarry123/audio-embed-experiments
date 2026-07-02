@@ -3,6 +3,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import mirdata
 from torch.utils.data import Dataset, DataLoader
+import librosa
+from datasets import load_dataset
 
 
 class MIRDataset(Dataset):
@@ -25,16 +27,6 @@ class MIRDataset(Dataset):
             for i in range(n_chunks):
                 start = i * chunk_size
                 self.chunk_index.append((tid, start, chunk_size))
-
-    @staticmethod
-    def pad(to_pad: np.ndarray, pad_size: int) -> np.ndarray:
-        """Right-pads a 1D array to `pad_size`"""
-        return np.pad(
-            to_pad, 
-            (0, pad_size - len(to_pad)), 
-            mode="constant", 
-            constant_values=0.0
-        )
 
     def __len__(self):
         return len(self.chunk_index)
@@ -65,7 +57,7 @@ class MIRDataset(Dataset):
         valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
 
         return train_loader, valid_loader
-
+    
 if __name__ == "__main__":
     import soundfile as sf
     dataset = MIRDataset("orchset")
@@ -74,4 +66,3 @@ if __name__ == "__main__":
         batch_size=1
     )
     sf.write(f"test_{dataset.dataset_name}.wav", valid_loader[0])
-    
