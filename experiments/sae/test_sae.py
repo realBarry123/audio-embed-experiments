@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from einops import rearrange
 import soundfile as sf
 
-from audembed import datasets, models
+from audembed import audio_datasets, models
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -22,7 +22,7 @@ state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
 sae = models.SAE(**configs).to(DEVICE)
 sae.load_state_dict(state_dict)
 
-dataset = datasets.MIRDataset("orchset", chunk_duration=1.0)
+dataset = audio_datasets.MIRDataset("orchset", chunk_duration=1.0)
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=1,
