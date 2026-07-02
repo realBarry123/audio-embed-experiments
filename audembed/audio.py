@@ -41,6 +41,7 @@ def to_spectrogram(x, target_frames, target_bins, return_complex=False):
     
     return mag
 
+
 def generate_audio(freqs):
 
     def _generate_phase(freqs):
@@ -68,7 +69,7 @@ def generate_audio(freqs):
     audio = torch.sin(phase)
     stereo = audio.unsqueeze(0).repeat(2, 1, 1)
     stereo = _mix(stereo)
-    stereo = stereo.permute(1, 0) # stupid but I have to do this
+    # stereo = stereo.permute(1, 0)
 
     return stereo
 
