@@ -8,7 +8,7 @@ from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from einops import rearrange
 
-from audembed import datasets, models, audio
+from audembed import audio_datasets, models, audio
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -27,7 +27,7 @@ state_dict, configs, start_epoch = torch.load("experiments/sae/models/probe.pt")
 probe = models.FeatureProbe(**configs).to(DEVICE)
 probe.load_state_dict(state_dict)
 
-dataset = datasets.MIRDataset("orchset")
+dataset = audio_datasets.MIRDataset("orchset")
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=1

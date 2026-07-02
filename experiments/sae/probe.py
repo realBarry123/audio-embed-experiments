@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from einops import rearrange
 import wandb
 
-from audembed import datasets, models, audio
+from audembed import audio_datasets, models, audio
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -118,7 +118,7 @@ if DO_WANDB:
         config=dict(probe.configs, **train_configs),
     )
 
-dataset = datasets.MIRDataset(train_configs["dataset_name"])
+dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=train_configs["batch_size"]
