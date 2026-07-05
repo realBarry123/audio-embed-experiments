@@ -10,7 +10,10 @@ dependencies = [
     "torch",
     "einops",
     "mirdata",
-    "numpy"
+    "numpy",
+    "datasets",
+    "librosa",
+    "soundfile",
 ]
 
 [tool.setuptools.packages.find]
