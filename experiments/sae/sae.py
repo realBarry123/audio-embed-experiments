@@ -115,13 +115,6 @@ except FileNotFoundError:
     start_epoch = 0
     model = models.SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
 
-if DO_WANDB:
-    run = wandb.init(
-        entity="barry-and-only-barry",
-        project="audio-embed-experiments",
-        config=dict(model.configs, **train_configs),
-    )
-
 dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
@@ -141,6 +134,13 @@ def vae_encode(audio):
     with diffusion_model.trace("_"):
         latent = diffusion_model.vae.encode(audio).latent_dist.mean.save()
     return rearrange(latent, "b c f -> b f c")
+
+if DO_WANDB:
+    run = wandb.init(
+        entity="barry-and-only-barry",
+        project="audio-embed-experiments",
+        config=dict(model.configs, **train_configs),
+    )
 
 for epoch in range(start_epoch, start_epoch + EPOCHS):
     train_loss, train_sparsity_loss, train_l0 = train_sae(

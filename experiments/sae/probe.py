@@ -111,13 +111,6 @@ except FileNotFoundError:
     start_epoch = 0
     probe = models.FeatureProbe(2048, 128, bias=False).to(DEVICE)
 
-if DO_WANDB:
-    run = wandb.init(
-        entity="barry-and-only-barry",
-        project="audio-embed-experiments",
-        config=dict(probe.configs, **train_configs),
-    )
-
 dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
@@ -132,6 +125,13 @@ diffusion_model = DiffusionModel(
     cache_dir=CACHE_PATH,
     device_map=DEVICE
 )
+
+if DO_WANDB:
+    run = wandb.init(
+        entity="barry-and-only-barry",
+        project="audio-embed-experiments",
+        config=dict(probe.configs, **train_configs),
+    )
 
 if start_epoch == 0: 
     valid_loss = valid_probe(
