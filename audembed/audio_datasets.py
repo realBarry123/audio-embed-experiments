@@ -31,7 +31,7 @@ class MIRDataset(Dataset):
                 start = i * chunk_size
                 self.chunk_index.append((tid, start, chunk_size))
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.chunk_index)
 
     def __getitem__(self, item: int) -> np.ndarray:
@@ -43,7 +43,7 @@ class MIRDataset(Dataset):
 
         return chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
 
-    def get_loaders(self, valid_split, batch_size, seed=0):
+    def get_loaders(self, valid_split, batch_size, seed=0) -> tuple[DataLoader, DataLoader]:
         """
         Adapted from https://stackoverflow.com/a/50544887 2026-06-10
         """
@@ -64,7 +64,7 @@ class MIRDataset(Dataset):
 
 class AudioSetDataset(Dataset):
     """
-    Dataset adapter for Hugging Face WavCaps dataset
+    Dataset adapter for AudioSet dataset
     """
     def __init__(self, chunk_duration=5.0):
         self.dataset = load_dataset("agkphysics/AudioSet", "balanced", streaming=False, split="train")
@@ -87,10 +87,10 @@ class AudioSetDataset(Dataset):
             except Exception as e:
                 print(f"Error processing sample {idx}: {e}")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.chunk_index)
 
-    def __getitem__(self, item: int) -> dict:
+    def __getitem__(self, item: int) -> torch.Tensor:
         dataset_idx, start, chunk_size = self.chunk_index[item]
         sample = self.dataset[dataset_idx]
         
@@ -110,7 +110,7 @@ class AudioSetDataset(Dataset):
 
         return chunk
 
-    def get_loaders(self, valid_split: float = 0.2, batch_size: int = 32, seed: int = 0):
+    def get_loaders(self, valid_split: float = 0.2, batch_size: int = 32, seed: int = 0) -> tuple[DataLoader, DataLoader]:
         """Create train/validation data loaders"""
         dataset_size = len(self)
         indices = list(range(dataset_size))
@@ -128,8 +128,6 @@ class AudioSetDataset(Dataset):
         return train_loader, valid_loader
 
 if __name__ == "__main__":
-    import soundfile as sf
-    from einops import rearrange
 
     dataset = MIRDataset("orchset")
     train_loader, valid_loader = dataset.get_loaders(
@@ -144,7 +142,7 @@ if __name__ == "__main__":
     dataset = AudioSetDataset()
     train_loader, valid_loader = dataset.get_loaders(valid_split=0.2, batch_size=32)
     for x in valid_loader:
-        x = rearrange(x, "1 channels frames -> frames channels")
-        sf.write(f"test_wavcaps.wav", x, 44100)
+        x = rearrange(x, "1 t c -> t c")
+        sf.write(f"test_audioset.wav", x, 44100)
         break
     
