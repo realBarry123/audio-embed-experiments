@@ -6,6 +6,7 @@ from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from einops import rearrange
 import wandb
+from itertools import islice
 
 from audembed import audio_datasets, models
 
@@ -17,9 +18,14 @@ def train_sae(
         encode_fn=None, 
         epoch=0, 
         device="cuda", 
-        do_tqdm=True
+        do_tqdm=True,
+        epoch_size=None
     ):
-    iterator = tqdm(loader, desc=f"E{epoch} Train") if do_tqdm else loader
+    if epoch_size is not None:
+        iterator = islice(loader, epoch_size)
+    else: 
+        iterator = loader
+    iterator = tqdm(iterator, desc=f"E{epoch} Train") if do_tqdm else iterator
     total_loss = 0
     total_sparsity_loss = 0
     total_l0 = 0
@@ -56,9 +62,14 @@ def valid_sae(
         encode_fn=None, 
         epoch=0, 
         device="cuda", 
-        do_tqdm=True
+        do_tqdm=True,
+        epoch_size=None
     ):
-    iterator = tqdm(loader, desc=f"E{epoch} Valid") if do_tqdm else loader
+    if epoch_size is not None:
+        iterator = islice(loader, epoch_size)
+    else: 
+        iterator = loader
+    iterator = tqdm(iterator, desc=f"E{epoch} Train") if do_tqdm else iterator
     total_loss = 0
     total_sparsity_loss = 0
     total_l0 = 0
@@ -92,7 +103,8 @@ train_configs = {
     "batch_size": 1, 
     "lr": 0.001,
     "lambda": 1e-4,
-    "dataset_name": "audioset"
+    "dataset_name": "audioset",
+    "epoch_size": 64
 }
 
 EPOCHS = 16
@@ -154,7 +166,8 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         lamb=train_configs["lambda"], 
         encode_fn=vae_encode, 
         epoch=epoch, 
-        device=DEVICE
+        device=DEVICE,
+        epoch_size=train_configs["epoch_size"]
     )
     valid_loss, valid_sparsity_loss, valid_l0 = valid_sae(
         model,
@@ -162,7 +175,8 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         lamb=train_configs["lambda"], 
         encode_fn=vae_encode, 
         epoch=epoch, 
-        device=DEVICE
+        device=DEVICE,
+        epoch_size=int(train_configs["epoch_size"]*0.2)
     )
     if DO_WANDB: 
         run.log({
