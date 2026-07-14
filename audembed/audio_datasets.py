@@ -1,9 +1,10 @@
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
+from einops import rearrange, repeat
 import mirdata
 from torch.utils.data import Dataset, DataLoader
-import librosa
+from torchaudio.functional import resample
 from datasets import load_dataset, Audio
 import io
 import soundfile as sf
@@ -95,13 +96,19 @@ class AudioSetDataset(Dataset):
         
         audio_bytes = sample["audio"]["bytes"]
         audio_array, fs = sf.read(io.BytesIO(audio_bytes))
-
+        audio_array = torch.tensor(audio_array.astype(np.float32)).to("cuda")
         if fs != self.fs:
-            audio_array = librosa.resample(audio_array, orig_sr=fs, target_sr=self.fs)
+            audio_array = resample(audio_array, orig_freq=fs, new_freq=self.fs)
     
         chunk = audio_array[start:start + chunk_size]
-        
-        return torch.tensor(chunk.astype(np.float32))
+        if len(list(chunk.shape)) == 1: # mono
+            chunk = repeat(chunk, "t -> 2 t")
+        elif chunk.shape[1] == 1: # sneaky mono
+            chunk = repeat(chunk.squeeze(1), "t -> 2 t")
+        else: 
+            chunk = rearrange(chunk[:, :2], "t c -> c t")
+
+        return chunk
 
     def get_loaders(self, valid_split: float = 0.2, batch_size: int = 32, seed: int = 0):
         """Create train/validation data loaders"""
