@@ -69,7 +69,7 @@ def valid_sae(
         iterator = islice(loader, epoch_size)
     else: 
         iterator = loader
-    iterator = tqdm(iterator, desc=f"E{epoch} Train") if do_tqdm else iterator
+    iterator = tqdm(iterator, desc=f"E{epoch} Valid") if do_tqdm else iterator
     total_loss = 0
     total_sparsity_loss = 0
     total_l0 = 0
@@ -104,7 +104,8 @@ train_configs = {
     "lr": 0.001,
     "lambda": 1e-4,
     "dataset_name": "audioset",
-    "epoch_size": 64
+    "epoch_size": 64,
+    "wandb_id": None
 }
 
 EPOCHS = 16
@@ -128,7 +129,7 @@ except FileNotFoundError:
     model = models.SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
 
 if train_configs["dataset_name"] == "audioset":
-    dataset = audio_datasets.AudioSetDataset()
+    dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0)
 else: 
     dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
 
@@ -152,11 +153,22 @@ def vae_encode(audio):
     return rearrange(latent, "b c f -> b f c")
 
 if DO_WANDB:
-    run = wandb.init(
-        entity="barry-and-only-barry",
-        project="audio-embed-experiments",
-        config=dict(model.configs, **train_configs),
-    )
+    if train_configs["run_id"] is not None:
+        run = wandb.init(
+            entity="barry-and-only-barry",
+            project="audio-embed-experiments",
+            config=dict(model.configs, **train_configs),
+            resume="allow",
+            id=train_configs["run_id"]
+        )
+    else:
+        run = wandb.init(
+            entity="barry-and-only-barry",
+            project="audio-embed-experiments",
+            config=dict(model.configs, **train_configs),
+            resume="allow"
+        )
+        train_configs["run_id"] = run.id
 
 for epoch in range(start_epoch, start_epoch + EPOCHS):
     train_loss, train_sparsity_loss, train_l0 = train_sae(
