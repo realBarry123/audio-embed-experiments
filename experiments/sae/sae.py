@@ -92,7 +92,7 @@ train_configs = {
     "batch_size": 1, 
     "lr": 0.001,
     "lambda": 1e-4,
-    "dataset_name": "orchset"
+    "dataset_name": "audioset"
 }
 
 EPOCHS = 16
@@ -115,7 +115,11 @@ except FileNotFoundError:
     start_epoch = 0
     model = models.SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
 
-dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
+if train_configs["dataset_name"] == "audioset":
+    dataset = audio_datasets.AudioSetDataset()
+else: 
+    dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
+
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=train_configs["batch_size"]

@@ -76,21 +76,13 @@ class AudioSetDataset(Dataset):
         # Pre-compute chunk indices
         for idx, sample in enumerate(self.dataset):
             try:
-                #print("sample:", sample)
-                #audio_array = sample['audio']['array']
-                #fs = sample['audio']['sampling_rate']
                 audio_bytes = sample["audio"]["bytes"]
-                audio_array, fs = sf.read(io.BytesIO(audio_bytes))
-                
-                if fs != self.fs:
-                    audio_array = librosa.resample(audio_array, orig_sr=fs, target_sr=self.fs)
-                
+                info = sf.info(io.BytesIO(audio_bytes))
+                n_frames_resampled = int(info.frames * self.fs / info.samplerate)
                 chunk_size = int(round(self.chunk_duration * self.fs))
-                n_chunks = int(np.floor(len(audio_array) / chunk_size))
-                
+                n_chunks = n_frames_resampled // chunk_size
                 for i in range(n_chunks):
-                    start = i * chunk_size
-                    self.chunk_index.append((idx, start, chunk_size))
+                    self.chunk_index.append((idx, i * chunk_size, chunk_size))
             except Exception as e:
                 print(f"Error processing sample {idx}: {e}")
 
@@ -101,8 +93,6 @@ class AudioSetDataset(Dataset):
         dataset_idx, start, chunk_size = self.chunk_index[item]
         sample = self.dataset[dataset_idx]
         
-        #audio_array = sample['audio']['array']
-        #fs = sample['audio']['sampling_rate']
         audio_bytes = sample["audio"]["bytes"]
         audio_array, fs = sf.read(io.BytesIO(audio_bytes))
 
