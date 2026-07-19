@@ -104,11 +104,11 @@ train_configs = {
     "lr": 0.001,
     "lambda": 1e-4,
     "dataset_name": "audioset",
-    "epoch_size": 64,
+    "epoch_size": 128,
     "wandb_id": None
 }
 
-EPOCHS = 16
+EPOCHS = 32
 SEED = 123
 
 if not load_dotenv():
@@ -153,7 +153,7 @@ def vae_encode(audio):
     return rearrange(latent, "b c f -> b f c")
 
 if DO_WANDB:
-    if train_configs["run_id"] is not None:
+    if "run_id" in train_configs:
         run = wandb.init(
             entity="barry-and-only-barry",
             project="audio-embed-experiments",
