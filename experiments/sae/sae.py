@@ -126,7 +126,7 @@ try:
     model.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    model = models.SAE(latent_dim=64, feature_dim=2048).to(DEVICE)
+    model = models.SAE(latent_dim=64, feature_dim=8192).to(DEVICE)
 
 if train_configs["dataset_name"] == "audioset":
     dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0)
