@@ -81,6 +81,8 @@ state_dict, configs, start_epoch = torch.load("experiments/sae/models/sae.pt")
 sae = models.SAE(**configs).to(DEVICE)
 sae.load_state_dict(state_dict)
 
+vae = models.VAEWrapper(CACHE_PATH, DEVICE)
+
 def encode_fn(x):
     latent = vae.encode(x)
     latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
