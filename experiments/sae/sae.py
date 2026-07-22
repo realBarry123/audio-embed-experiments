@@ -2,9 +2,7 @@ import os
 import torch
 from torch import nn
 from tqdm import tqdm
-from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
-from einops import rearrange
 import wandb
 from itertools import islice
 
@@ -140,17 +138,7 @@ train_loader, valid_loader = dataset.get_loaders(
 
 optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
 
-diffusion_model = DiffusionModel(
-    "stabilityai/stable-audio-open-1.0",
-    torch_dtype=torch.float32,
-    cache_dir=CACHE_PATH,
-    device_map=DEVICE
-)
-
-def vae_encode(audio):
-    with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encode(audio).latent_dist.mean.save()
-    return rearrange(latent, "b c f -> b f c")
+vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
 if DO_WANDB:
     if "run_id" in train_configs:
@@ -176,7 +164,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         train_loader, 
         optim, 
         lamb=train_configs["lambda"], 
-        encode_fn=vae_encode, 
+        encode_fn=vae.encode, 
         epoch=epoch, 
         device=DEVICE,
         epoch_size=train_configs["epoch_size"]
@@ -185,7 +173,7 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         model,
         valid_loader,
         lamb=train_configs["lambda"], 
-        encode_fn=vae_encode, 
+        encode_fn=vae.encode, 
         epoch=epoch, 
         device=DEVICE,
         epoch_size=int(train_configs["epoch_size"]*0.2)

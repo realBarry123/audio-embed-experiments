@@ -3,7 +3,6 @@ import os
 import torch
 from torch import nn
 from tqdm import tqdm
-import torchaudio.transforms as T
 from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from einops import rearrange
@@ -33,18 +32,11 @@ train_loader, valid_loader = dataset.get_loaders(
     batch_size=1
 )
 
-diffusion_model = DiffusionModel(
-    "stabilityai/stable-audio-open-1.0",
-    torch_dtype=torch.float32,
-    cache_dir=CACHE_PATH,
-    device_map=DEVICE
-)
+vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
-def encode(x):
-    with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
-
-    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
+def encode_fn(x):
+    latent = vae.encode(x)
+    latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
     with torch.no_grad():
         features = sae.encode(latent).detach()
     return features
@@ -60,7 +52,7 @@ probe.eval()
 with torch.no_grad():
     for x in iterator:
         x = x.to(DEVICE)
-        x_feat = encode(x).detach()
+        x_feat = encode_fn(x).detach()
         y = audio.to_spectrogram(x, target_frames=x_feat.shape[1], target_bins=128).squeeze(0)
         
         y_hat = probe(x_feat).squeeze(0) # (frames, bins)

@@ -2,8 +2,6 @@ import os
 import torch
 from torch import nn
 from tqdm import tqdm
-import torchaudio.transforms as T
-from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
 from einops import rearrange
 import wandb
@@ -84,10 +82,8 @@ sae = models.SAE(**configs).to(DEVICE)
 sae.load_state_dict(state_dict)
 
 def encode_fn(x):
-    with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encoder(x).save() # [batch, param*channel, frame]
-
-    latent = rearrange(latent, "b (p c) f -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
+    latent = vae.encode(x)
+    latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
     with torch.no_grad():
         features = sae.encode(latent).detach()
     return features
@@ -118,13 +114,6 @@ train_loader, valid_loader = dataset.get_loaders(
 )
 
 optim = torch.optim.Adam(params=probe.parameters(), lr=train_configs["lr"])
-
-diffusion_model = DiffusionModel(
-    "stabilityai/stable-audio-open-1.0",
-    torch_dtype=torch.float32,
-    cache_dir=CACHE_PATH,
-    device_map=DEVICE
-)
 
 if DO_WANDB:
     run = wandb.init(

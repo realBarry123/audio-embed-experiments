@@ -1,10 +1,6 @@
 import os
 import torch
-from torch import nn
-from tqdm import tqdm
-from nnsight.modeling.diffusion import DiffusionModel
 from dotenv import load_dotenv
-from einops import rearrange
 import soundfile as sf
 
 from audembed import audio_datasets, models
@@ -34,25 +30,9 @@ for x in valid_loader:
 
 sf.write(f"experiments/sae/results/{dataset.dataset_name}_sample.wav", audio[0].T, 44100)
 
-diffusion_model = DiffusionModel(
-    "stabilityai/stable-audio-open-1.0",
-    torch_dtype=torch.float32,
-    cache_dir=CACHE_PATH,
-    device_map=DEVICE
-)
+vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
-def vae_encode(audio):
-    with diffusion_model.trace("_"):
-        latent = diffusion_model.vae.encode(audio).latent_dist.mean.save()
-    return rearrange(latent, "b c f -> b f c")
-
-def vae_decode(latent):
-    latent = rearrange(latent, "b f c -> b c f")
-    with diffusion_model.trace("_"):
-        audio = diffusion_model.vae.decode(latent).sample.save()
-    return audio
-
-vae_latent = vae_encode(audio.to(DEVICE))
+vae_latent = vae.encode(audio.to(DEVICE))
 
 del audio
 torch.cuda.empty_cache()
@@ -65,13 +45,13 @@ torch.save(sae_latent, f"experiments/sae/results/{dataset.dataset_name}_sae_late
 with torch.no_grad():
     vae_latent_recon = sae.decode(sae_latent.T.unsqueeze(0)) # (batch=1, frame, latent_dim=64)
 
-audio_recon = vae_decode(vae_latent_recon).cpu()
+audio_recon = vae.decode(vae_latent_recon).cpu()
 audio_recon = audio_recon / audio_recon.abs().max()
 sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon.wav", audio_recon[0].T.detach(), 44100)
 
 del audio_recon
 torch.cuda.empty_cache()
 
-audio_recon_from_vae = vae_decode(vae_latent).cpu()
+audio_recon_from_vae = vae.decode(vae_latent).cpu()
 audio_recon_from_vae = audio_recon_from_vae / audio_recon_from_vae.abs().max()
 sf.write(f"experiments/sae/results/{dataset.dataset_name}_recon_from_vae.wav", audio_recon_from_vae[0].T.detach().cpu(), 44100)
