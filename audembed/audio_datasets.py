@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
+from tqdm import tqdm
 from einops import rearrange, repeat
 import mirdata
 from torch.utils.data import Dataset, DataLoader
@@ -14,8 +15,9 @@ class MIRDataset(Dataset):
     """
     Adapted from https://mirdata.readthedocs.io/en/stable/source/tutorial.html 06-09-2026
     """
-    def __init__(self, dataset_name: str, chunk_duration=5.0):
+    def __init__(self, dataset_name: str, chunk_duration=5.0, include_melody=False):
         self.dataset_name = dataset_name
+        self.include_melody = include_melody
         self.loader = mirdata.initialize(dataset_name)
         self.loader.download()
         self.loader.validate()
@@ -34,14 +36,24 @@ class MIRDataset(Dataset):
     def __len__(self) -> int:
         return len(self.chunk_index)
 
-    def __getitem__(self, item: int) -> np.ndarray:
+    def __getitem__(self, item: int) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         track_id, start, chunk_size = self.chunk_index[item]
         track = self.loader.track(track_id)
+
         audio_signal, fs = track.audio_stereo
+        audio_chunk = audio_signal[:, start: start+chunk_size]
 
-        chunk = audio_signal[:, start:start + chunk_size]
+        if self.include_melody:
+            melody = track.melody
+            assert fs == 44100
+            assert melody.frequency_unit in ["hz", "Hz"]
+            assert melody.time_unit == "s"
+            melody_signal = track.melody.frequencies.repeat((melody.times * fs).astype(np.int32)+1)
+            melody_chunk = melody_signal[start: start+chunk_size]
+            melody_chunk = np.log2(melody_chunk/440).astype(np.int32) * 12
+            return audio_chunk.astype(np.float32), melody_chunk
 
-        return chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
+        return audio_chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
 
     def get_loaders(self, valid_split, batch_size, seed=0) -> tuple[DataLoader, DataLoader]:
         """
@@ -129,15 +141,22 @@ class AudioSetDataset(Dataset):
 
 if __name__ == "__main__":
 
-    dataset = MIRDataset("orchset")
+    dataset = MIRDataset("orchset", include_melody=True)
     train_loader, valid_loader = dataset.get_loaders(
         valid_split=0.2, 
         batch_size=1
     )
-    for x in valid_loader:
-        x = rearrange(x, "1 channels frames -> frames channels")
-        sf.write(f"test_{dataset.dataset_name}.wav", x, 44100)
-        break
+    total_note_range = [0, 0]
+    for x, y in tqdm(train_loader):
+        # x = rearrange(x, "1 channels frames -> frames channels")
+        note_range = (y.min(), y.max())
+        if note_range[0].item() < total_note_range[0]:
+            total_note_range[0] = note_range[0].item()
+        elif note_range[1].item() > total_note_range[1]:
+            total_note_range[1] = note_range[1].item()
+        # sf.write(f"test_{dataset.dataset_name}.wav", x, 44100)
+    print("Orchset note range:", total_note_range)
+    exit()
 
     dataset = AudioSetDataset()
     train_loader, valid_loader = dataset.get_loaders(valid_split=0.2, batch_size=32)
