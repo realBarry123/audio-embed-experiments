@@ -50,7 +50,8 @@ class MIRDataset(Dataset):
             assert melody.time_unit == "s"
             melody_signal = track.melody.frequencies.repeat((melody.times * fs).astype(np.int32)+1)
             melody_chunk = melody_signal[start: start+chunk_size]
-            melody_chunk = np.log2(melody_chunk/440).astype(np.int32) * 12
+            melody_chunk = np.log2(melody_chunk/440).astype(np.int32) * 12 + 12
+            melody_chunk = torch.nn.functional.one_hot(melody_chunk, num_classes=25)
             return audio_chunk.astype(np.float32), melody_chunk
 
         return audio_chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
