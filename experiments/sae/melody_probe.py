@@ -104,10 +104,11 @@ except FileNotFoundError:
     start_epoch = 0
     probe = models.FeatureProbe(2048, 25, bias=False).to(DEVICE)
 
-dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
+dataset = audio_datasets.MIRDataset(train_configs["dataset_name"], chunk_duration=2.0, include_melody=True)
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
-    batch_size=train_configs["batch_size"]
+    batch_size=train_configs["batch_size"],
+    seed=123
 )
 
 optim = torch.optim.Adam(params=probe.parameters(), lr=train_configs["lr"])
