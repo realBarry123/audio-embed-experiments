@@ -34,10 +34,13 @@ def train_probe(
 
     for x, y in iterator:
         x = x.to(device)
+        y = y.to(device)
         x_feat = encode_fn(x).detach()
+
+        resample_factor = x.shape[2] // x_feat.shape[1]
+        y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
         
         y_hat = model(x_feat)
-        # print("y (spectrogram):", y.shape, "   y_hat (latent):", y_hat.shape)
         loss = nn.functional.mse_loss(y, y_hat)
         total_loss += loss.item()
         total += 1
@@ -64,7 +67,14 @@ def valid_probe(
     with torch.no_grad():
         for x, y in iterator:
             x = x.to(device)
+            y = y.to(device)
             x_feat = encode_fn(x).detach()
+
+            print(x.shape[1], x_feat.shape[1])
+
+            resample_factor = x.shape[2] // x_feat.shape[1]
+            y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
+            # print(y.shape)
 
             y_hat = model(x_feat)
             loss = nn.functional.mse_loss(y, y_hat)
@@ -81,7 +91,7 @@ vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
 def encode_fn(x):
     latent = vae.encode(x)
-    latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
+    # latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
     with torch.no_grad():
         features = sae.encode(latent).detach()
     return features
@@ -108,7 +118,7 @@ dataset = audio_datasets.MIRDataset(train_configs["dataset_name"], chunk_duratio
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=train_configs["batch_size"],
-    seed=123
+    seed=0
 )
 
 optim = torch.optim.Adam(params=probe.parameters(), lr=train_configs["lr"])
