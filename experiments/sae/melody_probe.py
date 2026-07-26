@@ -38,7 +38,7 @@ def train_probe(
         x_feat = encode_fn(x).detach()
 
         resample_factor = x.shape[2] // x_feat.shape[1]
-        y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
+        y = y[:, resample_factor//2::resample_factor, :][:, :x_feat.shape[1], :]
         
         y_hat = model(x_feat)
         loss = nn.functional.mse_loss(y, y_hat)
@@ -73,7 +73,7 @@ def valid_probe(
             print(x.shape[1], x_feat.shape[1])
 
             resample_factor = x.shape[2] // x_feat.shape[1]
-            y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
+            y = y[:, resample_factor//2::resample_factor, :][:, :x_feat.shape[1], :]
             # print(y.shape)
 
             y_hat = model(x_feat)
