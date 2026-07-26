@@ -21,6 +21,7 @@ class MIRDataset(Dataset):
         self.loader = mirdata.initialize(dataset_name)
         self.loader.download()
         self.loader.validate()
+        self.EMPTY_NOTE_FREQ = 2.0 ** (-25/12) * 440
 
         self.chunk_duration = chunk_duration
         self.chunk_index = []
@@ -50,8 +51,9 @@ class MIRDataset(Dataset):
             assert melody.time_unit == "s"
             melody_signal = track.melody.frequencies.repeat((melody.times * fs).astype(np.int32)+1)
             melody_chunk = melody_signal[start: start+chunk_size]
-            melody_chunk = np.log2(melody_chunk/440).astype(np.int32) * 12 + 12
-            melody_one_hot = np.zeros((melody_chunk.size, 25))
+            melody_chunk[np.abs(melody_chunk) <= 1e-3] = self.EMPTY_NOTE_FREQ
+            melody_chunk = (np.log2(melody_chunk/440) * 12).astype(np.int32) + 13
+            melody_one_hot = np.zeros((melody_chunk.size, 26))
             melody_one_hot[np.arange(melody_chunk.size), melody_chunk] = 1
             return audio_chunk.astype(np.float32), melody_one_hot
 

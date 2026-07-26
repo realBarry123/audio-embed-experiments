@@ -41,7 +41,7 @@ def train_probe(
         y = y[:, resample_factor//2::resample_factor, :][:, :x_feat.shape[1], :]
         
         y_hat = model(x_feat)
-        loss = nn.functional.mse_loss(y, y_hat)
+        loss = nn.functional.cross_entropy(y, y_hat)
         total_loss += loss.item()
         total += 1
 
@@ -77,7 +77,7 @@ def valid_probe(
             # print(y.shape)
 
             y_hat = model(x_feat)
-            loss = nn.functional.mse_loss(y, y_hat)
+            loss = nn.functional.cross_entropy(y, y_hat)
             total_loss += loss.item()
             total += 1
 
@@ -112,7 +112,7 @@ try:
     probe.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    probe = models.FeatureProbe(2048, 25, bias=False).to(DEVICE)
+    probe = models.FeatureProbe(2048, 26, bias=False).to(DEVICE)
 
 dataset = audio_datasets.MIRDataset(train_configs["dataset_name"], chunk_duration=2.0, include_melody=True)
 train_loader, valid_loader = dataset.get_loaders(
