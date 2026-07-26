@@ -38,10 +38,10 @@ def train_probe(
         x_feat = encode_fn(x).detach()
 
         resample_factor = x.shape[2] // x_feat.shape[1]
-        y = y[:, resample_factor//2::resample_factor, :][:, :x_feat.shape[1], :]
+        y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
         
-        y_hat = model(x_feat)
-        loss = nn.functional.cross_entropy(y, y_hat)
+        y_hat = model(x_feat)[:, :y.shape[1], :] # band-aid
+        loss = nn.functional.cross_entropy(y_hat, y)
         total_loss += loss.item()
         total += 1
 
@@ -73,11 +73,11 @@ def valid_probe(
             print(x.shape[1], x_feat.shape[1])
 
             resample_factor = x.shape[2] // x_feat.shape[1]
-            y = y[:, resample_factor//2::resample_factor, :][:, :x_feat.shape[1], :]
-            # print(y.shape)
+            y = y[:, ::resample_factor, :][:, :x_feat.shape[1], :]
 
-            y_hat = model(x_feat)
-            loss = nn.functional.cross_entropy(y, y_hat)
+            y_hat = model(x_feat)[:, :y.shape[1], :] # band-aid
+            print(y.shape, y_hat.shape)
+            loss = nn.functional.cross_entropy(y_hat, y)
             total_loss += loss.item()
             total += 1
 

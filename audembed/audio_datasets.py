@@ -10,6 +10,8 @@ from datasets import load_dataset, Audio
 import io
 import soundfile as sf
 
+import time
+
 
 class MIRDataset(Dataset):
     """
@@ -49,14 +51,22 @@ class MIRDataset(Dataset):
             assert fs == 44100
             assert melody.frequency_unit in ["hz", "Hz"]
             assert melody.time_unit == "s"
-            melody_signal = track.melody.frequencies.repeat((melody.times * fs).astype(np.int32)+1)
+            # diffs = np.diff(np.insert(melody.times, 0, 0.0)) * fs
+            # melody_signal = track.melody.frequencies.repeat(diffs.astype(np.int32)+1)
+            hop_samples = int(round((melody.times[1] - melody.times[0]) * fs))
+            melody_signal = melody.frequencies.repeat(hop_samples)
             melody_chunk = melody_signal[start: start+chunk_size]
-            melody_chunk[np.abs(melody_chunk) <= 1e-3] = self.EMPTY_NOTE_FREQ
-            melody_chunk = (np.log2(melody_chunk/440) * 12).astype(np.int32) + 13
+
+            mask = (np.abs(melody_chunk) <= 1e-3) | np.isnan(melody_chunk)
+            safe = np.where(mask, 1, melody_chunk)
+            melody_chunk = np.where(mask, 0, (np.log2(safe/440) * 12).astype(np.int32) + 13) 
+            melody_chunk = np.clip(melody_chunk, 0, 25) # band-aid solution for edge cases
+            # print(np.min(melody_chunk), np.max(melody_chunk))
+            
             melody_one_hot = np.zeros((melody_chunk.size, 26))
             melody_one_hot[np.arange(melody_chunk.size), melody_chunk] = 1
             return audio_chunk.astype(np.float32), melody_one_hot
-
+        
         return audio_chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
 
     def get_loaders(self, valid_split, batch_size, seed=0) -> tuple[DataLoader, DataLoader]:
