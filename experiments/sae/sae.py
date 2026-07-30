@@ -29,13 +29,14 @@ def train_sae(
     total_l0 = 0
     total = 0
 
+    model.train()
+
     for x in iterator: # x: (batch, channel=2, sample)
         x = x.to(device)
         if encode_fn is not None: 
             x = encode_fn(x).detach()
         
         # x: (batch, frame, latent_dim=64)
-        model.train()
         x_hat, h = model(x)
         sparsity_loss = lamb * torch.linalg.vector_norm(h, ord=1, dim=-1).mean()
         loss = nn.functional.mse_loss(x, x_hat) + sparsity_loss
@@ -73,13 +74,14 @@ def valid_sae(
     total_l0 = 0
     total = 0
 
+    model.eval()
+
     for x in iterator:
         x = x.to(device)
 
         if encode_fn is not None: 
             x = encode_fn(x).detach()
 
-        model.eval()
         with torch.no_grad():
             x_hat, h = model(x)
             sparsity_loss = lamb * torch.linalg.vector_norm(h, ord=1, dim=-1).mean()
@@ -102,8 +104,7 @@ train_configs = {
     "lr": 0.001,
     "lambda": 1e-4,
     "dataset_name": "audioset",
-    "epoch_size": 128,
-    "wandb_id": None
+    "epoch_size": 128
 }
 
 EPOCHS = 32
@@ -141,13 +142,13 @@ optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
 vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
 if DO_WANDB:
-    if "run_id" in train_configs:
+    if model.configs["wandb_id"] is not None:
         run = wandb.init(
             entity="barry-and-only-barry",
             project="audio-embed-experiments",
             config=dict(model.configs, **train_configs),
             resume="allow",
-            id=train_configs["run_id"]
+            id=model.config["wandb_id"]
         )
     else:
         run = wandb.init(
@@ -156,7 +157,7 @@ if DO_WANDB:
             config=dict(model.configs, **train_configs),
             resume="allow"
         )
-        train_configs["run_id"] = run.id
+        model.configs["wandb_id"] = run.id
 
 for epoch in range(start_epoch, start_epoch + EPOCHS):
     train_loss, train_sparsity_loss, train_l0 = train_sae(

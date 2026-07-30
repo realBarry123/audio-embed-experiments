@@ -3,13 +3,14 @@ from torch import nn
 from einops import rearrange
 
 class SAE(nn.Module):
-    def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True):
+    def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True, wandb_id=None):
         super().__init__()
         self.configs = {
             "latent_dim": latent_dim,
             "feature_dim": feature_dim,
             "do_relu": do_relu,
-            "do_norm": do_norm
+            "do_norm": do_norm,
+            "wandb_id": wandb_id
         }
         self.encoder_linear = nn.Linear(latent_dim, feature_dim, bias=True)
         self.decode = nn.Linear(feature_dim, latent_dim, bias=True)
