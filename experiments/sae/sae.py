@@ -102,7 +102,7 @@ DO_WANDB = True
 train_configs = {
     "batch_size": 1, 
     "lr": 0.001,
-    "lambda": 1e-4,
+    "lambda": 0.1,
     "dataset_name": "audioset",
     "epoch_size": 128
 }
@@ -142,13 +142,13 @@ optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
 vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
 if DO_WANDB:
-    if model.configs["wandb_id"] is not None:
+    if False and model.configs["wandb_id"] is not None:
         run = wandb.init(
             entity="barry-and-only-barry",
             project="audio-embed-experiments",
             config=dict(model.configs, **train_configs),
             resume="allow",
-            id=model.config["wandb_id"]
+            id=model.configs["wandb_id"]
         )
     else:
         run = wandb.init(
