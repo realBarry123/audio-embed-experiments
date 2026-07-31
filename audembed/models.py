@@ -3,7 +3,7 @@ from torch import nn
 from einops import rearrange
 
 class SAE(nn.Module):
-    def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True, wandb_id=None):
+    def __init__(self, latent_dim, feature_dim, do_relu=True, do_norm=True, wandb_id=None, k=None):
         super().__init__()
         self.configs = {
             "latent_dim": latent_dim,
@@ -16,11 +16,16 @@ class SAE(nn.Module):
         self.decode = nn.Linear(feature_dim, latent_dim, bias=True)
         self.relu = nn.ReLU()
         self.norm = nn.modules.normalization.RMSNorm([feature_dim,])
+        self.k = k if k is not None else latent_dim
     
     def encode(self, x):
         x = self.encoder_linear(x)
         if self.configs["do_relu"]: x = self.relu(x)
         if self.configs["do_norm"]: x = self.norm(x)
+        if self.k < self.latent_dim: 
+            values, indices = torch.topk(x, self.k, dim=-1)
+            x = torch.zeros_like(x, device=x.device)
+            x[indices] = values
         return x
 
     def forward(self, x):
