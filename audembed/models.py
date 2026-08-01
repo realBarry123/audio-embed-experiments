@@ -22,7 +22,7 @@ class SAE(nn.Module):
         x = self.encoder_linear(x)
         if self.configs["do_relu"]: x = self.relu(x)
         if self.configs["do_norm"]: x = self.norm(x)
-        if self.k < self.latent_dim: 
+        if self.k < self.configs["latent_dim"]: 
             values, indices = torch.topk(x, self.k, dim=-1)
             x = torch.zeros_like(x, device=x.device)
             x[indices] = values
