@@ -37,8 +37,8 @@ observations = []
 
 for x in valid_loader:
     latent = vae.encode(x)
-    latent = rearrange(latent, "b f (p c) -> b f c p", p=2)[..., 1] # (B, F, C=64)
-    latent = latent[:, random.randint(0, latent.shape[1]-1), :] # pick random frame
+    frame = random.randint(0, latent.shape[1]-1)
+    latent = latent[:, frame:frame+1, :]
     with torch.no_grad():
         features = sae.encode(latent).detach()
     observations.append(latent)

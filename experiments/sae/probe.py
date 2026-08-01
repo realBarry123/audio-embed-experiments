@@ -85,7 +85,6 @@ vae = models.VAEWrapper(CACHE_PATH, DEVICE)
 
 def encode_fn(x):
     latent = vae.encode(x)
-    latent = rearrange(latent, "b f (p c) -> b f c p", c=64, p=2)[..., 1] # (B, F, C=64)
     with torch.no_grad():
         features = sae.encode(latent).detach()
     return features
