@@ -26,6 +26,8 @@ N_CHANNELS = 128
 
 def find_ordering(observations):
     distance = 1 - torch.corrcoef(observations)
+    distance = (distance + distance.T) / 2
+    distance.fill_diagonal_(0)
     y = scipy.spatial.distance.squareform(distance) # to condensed form
     Z = scipy.cluster.hierarchy.linkage(y, method='average')
     Z_ordered = scipy.cluster.hierarchy.optimal_leaf_ordering(Z, y)
@@ -41,17 +43,18 @@ for x in valid_loader:
     latent = latent[:, frame:frame+1, :]
     with torch.no_grad():
         features = sae.encode(latent).detach()
-    observations.append(latent)
+    features = rearrange(features, "b 1 c -> b c")
+    observations.append(features)
     if i % 16 == 0: print(i)
     i += 1
     if i == N_OBSERVATIONS:
         break
 print("=== observations complete ===")
 
-observations = torch.stack(observations, dim=1) # (channel, sample)
+observations = torch.stack(observations, dim=1).squeeze(0).T # (channel, sample)
 
 top_channels = torch.topk(observations.sum(dim=1), k=N_CHANNELS).indices
-ordering = find_ordering(observations[top_channels])
+ordering = find_ordering(observations[top_channels].cpu())
 
 sae.decode.weight.data = sae.decode.weight[:, ordering] # no need to change decoder bias
 sae.decode.in_features = N_CHANNELS
