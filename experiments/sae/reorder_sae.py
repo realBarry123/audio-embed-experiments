@@ -62,6 +62,7 @@ sae.configs["feature_dim"] = N_CHANNELS
 sae.encoder_linear.weight.data = sae.encoder_linear.weight[ordering, :]
 sae.encoder_linear.bias.data = sae.encoder_linear.bias[ordering]
 sae.encoder_linear.out_features = N_CHANNELS
+sae.norm.weight.data = sae.norm.weight[ordering]
 
 sae = sae.to("cpu")
 torch.save([sae.state_dict(), sae.configs], "experiments/sae/models/reordered_sae.pt")
