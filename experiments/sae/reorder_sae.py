@@ -66,3 +66,4 @@ sae.norm.weight.data = sae.norm.weight[ordering]
 
 sae = sae.to("cpu")
 torch.save([sae.state_dict(), sae.configs], "experiments/sae/models/reordered_sae.pt")
+torch.save(ordering, "experiments/sae/results/ordering.pt")
