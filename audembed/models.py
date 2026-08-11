@@ -47,24 +47,24 @@ class FeatureProbe(nn.Module):
         return self.linear(x)
     
 
-from nnsight.modeling.diffusion import DiffusionModel
+from diffusers import AutoencoderOobleck
 
 class VAEWrapper(nn.Module):
     def __init__(self, cache_path, device):
-        self.model = DiffusionModel(
+        super().__init__()
+        self.model = AutoencoderOobleck.from_pretrained(
             "stabilityai/stable-audio-open-1.0",
+            subfolder="vae",
             torch_dtype=torch.float32,
             cache_dir=cache_path,
             device_map=device
         )
 
     def encode(self, audio):
-        with self.model.trace("_"):
-            latent = self.model.vae.encode(audio).latent_dist.mean.save()
+        latent = self.model.encode(audio).latent_dist.mean
         return rearrange(latent, "b c f -> b f c")
 
     def decode(self, latent):
         latent = rearrange(latent, "b f c -> b c f")
-        with self.model.trace("_"):
-            audio = self.model.vae.decode(latent).sample.save()
+        audio = self.model.decode(latent).sample
         return audio
