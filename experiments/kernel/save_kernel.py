@@ -3,7 +3,7 @@ import torch
 from diffusers import AutoencoderOobleck
 from dotenv import load_dotenv
 
-from audembed import vae_utils
+from audembed import conv
 
 if not load_dotenv(): 
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -25,7 +25,7 @@ CONV_LAYERS = [
     vae.encoder.block[0].res_unit2.conv1,
     vae.encoder.block[0].res_unit2.conv2,
 ]
-virtual_kernel = vae_utils.create_virtual_kernel(CONV_LAYERS, control=False)
+virtual_kernel = conv.create_virtual_kernel(CONV_LAYERS, control=False)
 print(virtual_kernel.shape)
 
 START = 0
