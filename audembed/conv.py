@@ -46,6 +46,16 @@ class ConvLayer():
             self.weight, self.bias, 
             other.weight, other.bias
         )
+
+    def __add__(self, other):
+        return ConvLayer(
+            weight = self.weight + other.weight,
+            bias = self.bias + other.bias
+        )
+
+    def __iadd__(self, other):
+        self.weight += other.weight
+        self.bias += other.bias
     
     def __str__(self):
         return f"ConvLayer(weight.shape={self.weight.shape}, bias.shape={self.bias.shape})"
@@ -59,12 +69,21 @@ def create_virtual_kernel(convs: list[nn.Module] | tuple[nn.Module], control=Fal
 
 if __name__ == "__main__":
     import data
+    x = torch.randn((2, 64))
+
     layers = [
         ConvLayer(weight=torch.randn((128, 2, 7)), bias=torch.randn((128,))),
-        ConvLayer(weight=torch.randn((128, 128, 7)), bias=torch.randn((128,)))
+        ConvLayer(weight=torch.randn((128, 128, 7)), bias=torch.randn((128,))),
+        ConvLayer(weight=torch.randn((128, 128, 7)), bias=torch.randn((128,))),
+        ConvLayer(weight=torch.randn((128, 2, 7)), bias=torch.randn((128,))),
+        ConvLayer(weight=torch.randn((128, 128, 13)), bias=torch.randn((128,)))
     ]
-    combined = layers[0] * layers[1]
-    x = torch.randn((2, 64))
-    y = layers[1](layers[0](x))
+    combined = layers[0] * layers[1] * layers[2] + layers[3] * layers[4]
+    y = layers[2](layers[1](layers[0](x))) + layers[4](layers[3](x))
     y_pred = combined(x)
-    data.plot_heatmap_2d(y - y_pred)
+    data.plot_heatmap_2d(
+        y - y_pred, 
+        xlabel="frames", 
+        ylabel="channels", 
+        title="difference in output between original and combined operation"
+    )
