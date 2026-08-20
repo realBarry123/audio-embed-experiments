@@ -92,11 +92,12 @@ class AudioSetDataset(Dataset):
     """
     Dataset adapter for AudioSet dataset
     """
-    def __init__(self, chunk_duration=5.0):
+    def __init__(self, chunk_duration=5.0, device="cuda"):
         self.dataset = load_dataset("agkphysics/AudioSet", "balanced", streaming=False, split="train")
         self.dataset = self.dataset.cast_column("audio", Audio(decode=False))
         self.chunk_duration = chunk_duration
         self.fs = 44100
+        self.device = device
 
         self.chunk_index = []
         
@@ -122,7 +123,7 @@ class AudioSetDataset(Dataset):
         
         audio_bytes = sample["audio"]["bytes"]
         audio_array, fs = sf.read(io.BytesIO(audio_bytes))
-        audio_array = torch.tensor(audio_array.astype(np.float32)).to("cuda")
+        audio_array = torch.tensor(audio_array.astype(np.float32)).to(self.device)
         if fs != self.fs:
             audio_array = resample(audio_array, orig_freq=fs, new_freq=self.fs)
     
