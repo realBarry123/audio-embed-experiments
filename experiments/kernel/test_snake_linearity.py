@@ -22,7 +22,7 @@ vae = AutoencoderOobleck.from_pretrained(
 
 dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0, device=DEVICE)
 train_loader, valid_loader = dataset.get_loaders(
-    valid_split=0.005, # comes down to 457 clips
+    valid_split=0.01, # comes down to 915 clips
     batch_size=1
 )
 encoder = nnsight.NNsight(vae.encoder)
@@ -43,16 +43,19 @@ snake_layers.update({"final_snake1": encoder.snake1})
 
 snake_losses = snake_layers.fromkeys(snake_layers, 0)
 
-def loss_fn(x, y):
-    cos_sim = torch.nn.functional.cosine_similarity(x.flatten(), y.flatten(), dim=0).item()
-    return (cos_sim + 1) / 2
+#def loss_fn(x, y):
+#    cos_sim = torch.nn.functional.cosine_similarity(x.flatten(), y.flatten(), dim=0).item()
+#    return (cos_sim + 1) / 2
+
+def mre(x, y):
+    return (x - y).abs().mean().item() / x.abs().mean().item()
 
 i = 0
 for x in tqdm(valid_loader):
     x = x.to(DEVICE)
     with encoder.trace(x):
         for name, module in snake_layers.items():
-            loss = loss_fn(module.input.save(), module.output.save())
+            loss = mre(module.input.save(), module.output.save())
             snake_losses[name] += loss
     i += 1
 
