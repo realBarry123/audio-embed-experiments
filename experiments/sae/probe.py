@@ -102,11 +102,11 @@ SEED = 123
 
 try: 
     state_dict, configs, start_epoch = torch.load("experiments/sae/models/probe.pt")
-    probe = models.FeatureProbe(**configs).to(DEVICE)
+    probe = models.LinearProbe(**configs).to(DEVICE)
     probe.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    probe = models.FeatureProbe(2048, 128, bias=False).to(DEVICE)
+    probe = models.LinearProbe(2048, 128, bias=False).to(DEVICE)
 
 dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
 train_loader, valid_loader = dataset.get_loaders(

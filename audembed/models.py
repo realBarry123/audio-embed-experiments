@@ -33,15 +33,15 @@ class SAE(nn.Module):
         x_hat = self.decode(h) # (batch, frame, latent_dim=64)
         return x_hat, h
    
-class FeatureProbe(nn.Module):
-    def __init__(self, feature_dim, logit_dim, bias):
+class LinearProbe(nn.Module):
+    def __init__(self, in_features, out_features, bias: bool):
         super().__init__()
         self.configs = {
-            "feature_dim": feature_dim,
-            "logit_dim": logit_dim,
+            "feature_dim": in_features,
+            "logit_dim": out_features,
             "bias": bias
         }
-        self.linear = nn.Linear(feature_dim, logit_dim, bias=bias)
+        self.linear = nn.Linear(in_features, out_features, bias=bias)
     
     def forward(self, x):
         return self.linear(x)

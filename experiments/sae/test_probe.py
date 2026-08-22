@@ -25,7 +25,7 @@ sae = models.SAE(**configs).to(DEVICE)
 sae.load_state_dict(state_dict)
 
 state_dict, configs, start_epoch = torch.load("experiments/sae/models/probe.pt")
-probe = models.FeatureProbe(**configs).to(DEVICE)
+probe = models.LinearProbe(**configs).to(DEVICE)
 probe.load_state_dict(state_dict)
 
 if DATASET_NAME == "audioset":
