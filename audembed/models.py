@@ -37,8 +37,8 @@ class LinearProbe(nn.Module):
     def __init__(self, in_features, out_features, bias: bool):
         super().__init__()
         self.configs = {
-            "feature_dim": in_features,
-            "logit_dim": out_features,
+            "in_features": in_features,
+            "out_features": out_features,
             "bias": bias
         }
         self.linear = nn.Linear(in_features, out_features, bias=bias)

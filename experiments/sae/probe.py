@@ -5,6 +5,7 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from einops import rearrange
 import wandb
+from itertools import islice
 
 from audembed import audio_datasets, models, audio
 
@@ -25,9 +26,14 @@ def train_probe(
         encode_fn, 
         epoch=0, 
         device="cuda", 
-        do_tqdm=True
+        do_tqdm=True,
+        epoch_size=None
     ):
-    iterator = tqdm(loader, desc=f"E{epoch} Train") if do_tqdm else loader
+    if epoch_size is not None:
+        iterator = islice(loader, epoch_size)
+    else: 
+        iterator = loader
+    iterator = tqdm(iterator, desc=f"E{epoch} Train") if do_tqdm else loader
     total_loss = 0
     total = 0
 
@@ -57,9 +63,14 @@ def valid_probe(
         encode_fn, 
         epoch=0, 
         device="cuda", 
-        do_tqdm=True
+        do_tqdm=True,
+        epoch_size=None
     ):
-    iterator = tqdm(loader, desc=f"E{epoch} Valid") if do_tqdm else loader
+    if epoch_size is not None:
+        iterator = islice(loader, epoch_size)
+    else: 
+        iterator = loader
+    iterator = tqdm(iterator, desc=f"E{epoch} Valid") if do_tqdm else loader
     total_loss = 0
     total = 0
 
@@ -93,8 +104,9 @@ DO_WANDB = True
 
 train_configs = {
     "batch_size": 1, 
-    "lr": 0.001,
-    "dataset_name": "audioset"
+    "lr": 1e-4,
+    "dataset_name": "audioset",
+    "epoch_size": 512
 }
 
 EPOCHS = 16
@@ -106,7 +118,7 @@ try:
     probe.load_state_dict(state_dict)
 except FileNotFoundError:
     start_epoch = 0
-    probe = models.LinearProbe(2048, 128, bias=False).to(DEVICE)
+    probe = models.LinearProbe(sae.configs["feature_dim"], 128, bias=False).to(DEVICE)
 
 if train_configs["dataset_name"] != "audioset":
     dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
@@ -134,7 +146,8 @@ if start_epoch == 0:
         y_fn=audio.to_spectrogram, 
         encode_fn=encode_fn, 
         epoch=-1,
-        device=DEVICE
+        device=DEVICE,
+        epoch_size=int(train_configs["epoch_size"]*0.2)
     )
     print("Initial validation loss:", valid_loss)
 
@@ -146,7 +159,8 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         y_fn=audio.to_spectrogram,
         encode_fn=encode_fn, 
         epoch=epoch, 
-        device=DEVICE
+        device=DEVICE,
+        epoch_size=train_configs["epoch_size"]
     )
     valid_loss = valid_probe(
         probe,
@@ -154,7 +168,8 @@ for epoch in range(start_epoch, start_epoch + EPOCHS):
         y_fn=audio.to_spectrogram, 
         encode_fn=encode_fn, 
         epoch=epoch, 
-        device=DEVICE
+        device=DEVICE,
+        epoch_size=int(train_configs["epoch_size"]*0.2)
     )
     if DO_WANDB: 
         run.log({
