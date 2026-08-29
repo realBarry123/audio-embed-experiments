@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from __future__ import annotations
 
 class ConvLayer():
     def __init__(self, module: nn.Module=None, weight=None, bias=None, control=False):
@@ -34,26 +35,43 @@ class ConvLayer():
         bias = w2.sum(-1) @ b1 + b2
         return weight, bias
 
-    def __mul__(self, other):
-        weight, bias = self._combine_conv1d(
-            self.weight, self.bias, 
-            other.weight, other.bias
-        )
-        return ConvLayer(weight=weight, bias=bias)
+    def __mul__(self, other: ConvLayer | SnakeLinearized):
+        if type(other) is ConvLayer:
+            weight, bias = self._combine_conv1d(
+                self.weight, self.bias, 
+                other.weight, other.bias
+            )
+            return ConvLayer(weight=weight, bias=bias)
+        elif type(other) is SnakeLinearized:
+            weight, bias = self._combine_conv1d(
+                self.weight, self.bias,
+                torch.diag(other.weight.detach()).unsqueeze(0), other.bias.detach()
+            )
+            return weight, bias
+        else:
+            raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
     
-    def __imul__(self, other):
-        self.weight, self.bias = self._combine_conv1d(
-            self.weight, self.bias, 
-            other.weight, other.bias
-        )
+    def __imul__(self, other: ConvLayer | SnakeLinearized):
+        if type(other) is ConvLayer:
+            self.weight, self.bias = self._combine_conv1d(
+                self.weight, self.bias, 
+                other.weight, other.bias
+            )
+        elif type(other) is SnakeLinearized:
+            self.weight, self.bias = self._combine_conv1d(
+                self.weight, self.bias,
+                torch.diag(other.weight.detach()).unsqueeze(0), other.bias.detach()
+            )
+        else:
+            raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
 
-    def __add__(self, other):
+    def __add__(self, other: ConvLayer):
         return ConvLayer(
             weight = self.weight + other.weight,
             bias = self.bias + other.bias
         )
 
-    def __iadd__(self, other):
+    def __iadd__(self, other: ConvLayer):
         self.weight += other.weight
         self.bias += other.bias
     
@@ -66,6 +84,26 @@ def create_virtual_kernel(convs: list[nn.Module] | tuple[nn.Module], control=Fal
         conv_kernel = ConvLayer(module=conv, control=control)
         combined *= conv_kernel
     return combined
+
+class SnakeLinearized(nn.Module):
+    def __init__(self, features, module=None, alpha=None, beta=None):
+        super().__init__()
+        self.features = features
+        if module is not None:
+            self.alpha = module.alpha.detach().clone()
+            self.beta = module.beta.detach().clone()
+        else:
+            self.alpha = alpha
+            self.beta = beta
+        self.weight = torch.nn.Parameter(torch.zeros(features))
+        self.bias = torch.nn.Parameter(torch.zeros(features))
+
+    def original(self, x):
+        return torch.sin(self.alpha * x) ** 2 / self.beta
+
+    def forward(self, x):
+        return x * self.weight + self.bias
+    
 
 if __name__ == "__main__":
     import data
