@@ -27,7 +27,8 @@ def train_probe(
         epoch=0, 
         device="cuda", 
         do_tqdm=True,
-        epoch_size=None
+        epoch_size=None,
+        accum_steps=32
     ):
     if epoch_size is not None:
         iterator = islice(loader, epoch_size)
@@ -38,11 +39,14 @@ def train_probe(
     total = 0
 
     model.train()
-
+    
+    i = 0
     for x in iterator:
         x = x.to(device)
         x_feat = encode_fn(x).detach()
         y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
+        y = torch.log1p(y)  # compress dynamic range (power spectra can span orders of magnitude)
+        y = (y - y.mean()) / (y.std() + 1e-8)  # zero mean, unit variance
         
         y_hat = model(x_feat)
         # print("y (spectrogram):", y.shape, "   y_hat (latent):", y_hat.shape)
@@ -50,9 +54,12 @@ def train_probe(
         total_loss += loss.item()
         total += 1
 
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
+        (loss / accum_steps).backward()
+
+        if (i + 1) % accum_steps == 0:
+            optim.step()
+            optim.zero_grad()
+        i += 1
 
     return total_loss / total
 
@@ -80,6 +87,8 @@ def valid_probe(
             x = x.to(device)
             x_feat = encode_fn(x).detach()
             y = y_fn(x, target_frames=x_feat.shape[1], target_bins=128)
+            y = torch.log1p(y)  # compress dynamic range (power spectra can span orders of magnitude)
+            y = (y - y.mean()) / (y.std() + 1e-8)  # zero mean, unit variance
             
             y_hat = model(x_feat)
             loss = nn.functional.mse_loss(y, y_hat)
@@ -104,7 +113,7 @@ DO_WANDB = True
 
 train_configs = {
     "batch_size": 1, 
-    "lr": 1e-4,
+    "lr": 8e-3,
     "dataset_name": "audioset",
     "epoch_size": 512
 }
