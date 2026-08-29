@@ -94,7 +94,7 @@ DO_WANDB = True
 train_configs = {
     "batch_size": 1, 
     "lr": 0.001,
-    "dataset_name": "orchset"
+    "dataset_name": "audioset"
 }
 
 EPOCHS = 16
@@ -108,7 +108,11 @@ except FileNotFoundError:
     start_epoch = 0
     probe = models.LinearProbe(2048, 128, bias=False).to(DEVICE)
 
-dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
+if train_configs["dataset_name"] != "audioset":
+    dataset = audio_datasets.MIRDataset(train_configs["dataset_name"])
+else:
+    dataset = audio_datasets.AudioSetDataset(chunk_duration=5, device=DEVICE)
+    
 train_loader, valid_loader = dataset.get_loaders(
     valid_split=0.2, 
     batch_size=train_configs["batch_size"]
