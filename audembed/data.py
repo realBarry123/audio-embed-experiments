@@ -121,7 +121,7 @@ def plot_heatmap_2d(x, xlabel="x", ylabel="y", title=None, cmap="viridis", vmin=
     data = x.detach().cpu().numpy()  # shape -> (d, t)
 
     fig, ax = plt.subplots()
-    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+    im = ax.imshow(data, aspect="auto", origin="lower", cmap=cmap, vmin=vmin, vmax=vmax, interpolation='none')
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if title is not None:
