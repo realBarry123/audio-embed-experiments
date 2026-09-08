@@ -1,4 +1,5 @@
 import torch
+import random
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 from tqdm import tqdm
@@ -9,8 +10,20 @@ from torchaudio.functional import resample
 from datasets import load_dataset, Audio
 import io
 import soundfile as sf
+from itertools import islice
 
 import time
+
+class SeedRandomSampler(torch.utils.data.Sampler):
+  def __init__(self, indices, seed):
+    self.indices = indices
+    random.Random(seed).shuffle(indices)
+
+  def __iter__(self):
+    return iter(self.indices)
+
+  def __len__(self):
+    return len(self.indices)
 
 
 class MIRDataset(Dataset):
@@ -86,6 +99,17 @@ class MIRDataset(Dataset):
         valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
 
         return train_loader, valid_loader
+
+    def get_minimal_loader(self, batch_size=1, seed=0, n_samples=None):
+        """Create loader with no SubsetRandomSampler, mainly for reproducible experiments"""
+        indices = list(range(len(self)))
+        sampler = SeedRandomSampler(indices, seed=seed)
+
+        loader = DataLoader(self, batch_size=batch_size, sampler=sampler)
+        if not n_samples:
+            return loader
+        else:
+            return islice(loader, n_samples)
     
 
 class AudioSetDataset(Dataset):
@@ -153,6 +177,17 @@ class AudioSetDataset(Dataset):
         valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
         
         return train_loader, valid_loader
+
+    def get_minimal_loader(self, batch_size=1, seed=0, n_samples=None):
+        """Create loader with no SubsetRandomSampler, mainly for reproducible experiments"""
+        indices = list(range(len(self)))
+        sampler = SeedRandomSampler(indices, seed=seed)
+
+        loader = DataLoader(self, batch_size=batch_size, sampler=sampler)
+        if not n_samples:
+            return loader
+        else:
+            return islice(loader, n_samples)
 
 if __name__ == "__main__":
 
