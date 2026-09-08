@@ -20,27 +20,27 @@ vae = AutoencoderOobleck.from_pretrained(
     torch_dtype=torch.float32,
     cache_dir=CACHE_PATH
 ).to(DEVICE)
-
-dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0, device=DEVICE)
-train_loader, valid_loader = dataset.get_loaders(
-    valid_split=0.01,
-    batch_size=1,
-)
-
 encoder = nnsight.NNsight(vae.encoder)
-ABLATED = encoder.block[0].res_unit1.snake1
-NUM_SAMPLES = 1
 
-i = 0
-for x in valid_loader:
-    sf.write(f"experiments/kernel/results/ablation/{i}_original.wav", x[0].T.cpu(), 44100)
+N_SAMPLES = 3
+dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0, device=DEVICE)
+loader = dataset.get_minimal_loader(n_samples=N_SAMPLES)
+
+ABLATED_LAYERS = [
+    encoder.block[0].res_unit1.snake1,
+    encoder.block[0].snake1
+]
+
+for i, x in enumerate(loader):
     x = x.to(DEVICE)
     x_hat = vae.decoder(encoder(x)[:, :64, :])
-    sf.write(f"experiments/kernel/results/ablation/{i}_recon.wav", x_hat[0].T.detach().cpu(), 44100)
-    with encoder.trace(x):
-        ABLATED.output = ABLATED.input.save()
-        x_hat = vae.decoder(encoder.output.save()[:, :64, :])
-        sf.write(f"experiments/kernel/results/ablation/{i}_ablated_recon.wav", x_hat[0].T.detach().cpu(), 44100)
+    audios = [x[0].T.cpu(), x_hat[0].T.detach().cpu()]
+    for layer in ABLATED_LAYERS:
+        with encoder.trace(x):
+            layer.output = layer.input.save()
+            x_hat = vae.decoder(encoder.output.save()[:, :64, :])
+            audios.append(x_hat[0].T.detach().cpu())
 
-    i += 1
-    if i == NUM_SAMPLES: break
+    audios = torch.cat(audios, dim=0)
+    sf.write(f"experiments/kernel/results/ablation/{i}.wav", audios, 44100)
+    
