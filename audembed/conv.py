@@ -1,6 +1,6 @@
+from __future__ import annotations
 import torch
 from torch import nn
-from __future__ import annotations
 
 class ConvLayer():
     def __init__(self, module: nn.Module=None, weight=None, bias=None, control=False):
@@ -90,13 +90,13 @@ class SnakeLinearized(nn.Module):
         super().__init__()
         self.features = features
         if module is not None:
-            self.alpha = module.alpha.detach().clone()
-            self.beta = module.beta.detach().clone()
+            self.register_buffer("alpha", module.alpha.detach().clone())
+            self.register_buffer("beta", module.beta.detach().clone())
         else:
-            self.alpha = alpha
-            self.beta = beta
-        self.weight = torch.nn.Parameter(torch.zeros(features))
-        self.bias = torch.nn.Parameter(torch.zeros(features))
+            self.register_buffer("alpha", alpha.detach().clone())
+            self.register_buffer("beta", beta.detach().clone())
+        self.weight = torch.nn.Parameter(torch.zeros(1, features, 1))
+        self.bias = torch.nn.Parameter(torch.zeros(1, features, 1))
 
     def original(self, x):
         return torch.sin(self.alpha * x) ** 2 / self.beta
