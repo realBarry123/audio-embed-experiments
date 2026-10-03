@@ -1,32 +1,61 @@
 import torch
 import random
-from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 from tqdm import tqdm
 from einops import rearrange, repeat
 import mirdata
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Sampler, Subset
+from torch.utils.data.sampler import SubsetRandomSampler
 from torchaudio.functional import resample
 from datasets import load_dataset, Audio
 import io
 import soundfile as sf
-from itertools import islice
 
 import time
 
-class SeedRandomSampler(torch.utils.data.Sampler):
-  def __init__(self, indices, seed):
-    self.indices = indices
-    random.Random(seed).shuffle(indices)
+class SeedRandomSampler(Sampler):
+    """Adapted from https://discuss.pytorch.org/t/setting-seed-for-data-samplers-torch-utils-data-sampler/40252/2"""
+    def __init__(self, indices, seed):
+        self.indices = indices
+        random.Random(seed).shuffle(indices)
 
-  def __iter__(self):
-    return iter(self.indices)
+    def __iter__(self):
+        return iter(self.indices)
 
-  def __len__(self):
-    return len(self.indices)
+    def __len__(self):
+        return len(self.indices)
+
+class DatasetWrapper(Dataset):
+    def get_loaders(self, subset=None, valid_split=0.2, batch_size=1, seed=0) -> tuple[DataLoader, DataLoader]:
+        """
+        Adapted from https://stackoverflow.com/a/50544887 2026-06-10
+        """
+        subset = self if subset is None else Subset(self, range(subset))
+        dataset_size = len(subset)
+        indices = list(range(dataset_size))
+        split = int(np.floor(valid_split * dataset_size))
+        
+        np.random.seed(seed)
+        np.random.shuffle(indices)
+        
+        train_sampler = SubsetRandomSampler(indices[split:])
+        valid_sampler = SubsetRandomSampler(indices[:split])
+        
+        train_loader = DataLoader(subset, batch_size=batch_size, sampler=train_sampler)
+        valid_loader = DataLoader(subset, batch_size=batch_size, sampler=valid_sampler)
+        
+        return train_loader, valid_loader
+
+    def get_minimal_loader(self, subset=None, batch_size=1, seed=0):
+        """Create loader with no SubsetRandomSampler, mainly for reproducible experiments"""
+        dataset_size = len(self) if subset is None else min(subset, len(self))
+        indices = list(range(dataset_size))
+        sampler = SeedRandomSampler(indices, seed=seed)
+        loader = DataLoader(self, batch_size=batch_size, sampler=sampler)
+        return loader
 
 
-class MIRDataset(Dataset):
+class MIRDataset(DatasetWrapper):
     """
     Adapted from https://mirdata.readthedocs.io/en/stable/source/tutorial.html 06-09-2026
     """
@@ -81,40 +110,9 @@ class MIRDataset(Dataset):
             return audio_chunk.astype(np.float32), melody_one_hot
         
         return audio_chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
-
-    def get_loaders(self, subset=None, valid_split=0.2, batch_size=32, seed=0) -> tuple[DataLoader, DataLoader]:
-        """
-        Adapted from https://stackoverflow.com/a/50544887 2026-06-10
-        """
-        subset = self if not subset else torch.utils.data.Subset(self, range(subset))
-        dataset_size = len(subset)
-        indices = list(range(dataset_size))
-        split = int(np.floor(valid_split * dataset_size))
-        
-        np.random.seed(seed)
-        np.random.shuffle(indices)
-        
-        train_sampler = SubsetRandomSampler(indices[split:])
-        valid_sampler = SubsetRandomSampler(indices[:split])
-        
-        train_loader = DataLoader(subset, batch_size=batch_size, sampler=train_sampler)
-        valid_loader = DataLoader(subset, batch_size=batch_size, sampler=valid_sampler)
-        
-        return train_loader, valid_loader
-
-    def get_minimal_loader(self, batch_size=1, seed=0, n_samples=None):
-        """Create loader with no SubsetRandomSampler, mainly for reproducible experiments"""
-        indices = list(range(len(self)))
-        sampler = SeedRandomSampler(indices, seed=seed)
-
-        loader = DataLoader(self, batch_size=batch_size, sampler=sampler)
-        if not n_samples:
-            return loader
-        else:
-            return islice(loader, n_samples)
     
 
-class AudioSetDataset(Dataset):
+class AudioSetDataset(DatasetWrapper):
     """
     Dataset adapter for AudioSet dataset
     """
@@ -163,34 +161,6 @@ class AudioSetDataset(Dataset):
 
         return chunk
 
-    def get_loaders(self, subset=None, valid_split=0.2, batch_size=32, seed=0) -> tuple[DataLoader, DataLoader]:
-        """Create train/validation data loaders"""
-        subset = self if not subset else torch.utils.data.Subset(self, range(subset))
-        dataset_size = len(subset)
-        indices = list(range(dataset_size))
-        split = int(np.floor(valid_split * dataset_size))
-        
-        np.random.seed(seed)
-        np.random.shuffle(indices)
-        
-        train_sampler = SubsetRandomSampler(indices[split:])
-        valid_sampler = SubsetRandomSampler(indices[:split])
-        
-        train_loader = DataLoader(subset, batch_size=batch_size, sampler=train_sampler)
-        valid_loader = DataLoader(subset, batch_size=batch_size, sampler=valid_sampler)
-        
-        return train_loader, valid_loader
-
-    def get_minimal_loader(self, batch_size=1, seed=0, n_samples=None):
-        """Create loader with no SubsetRandomSampler, mainly for reproducible experiments"""
-        indices = list(range(len(self)))
-        sampler = SeedRandomSampler(indices, seed=seed)
-
-        loader = DataLoader(self, batch_size=batch_size, sampler=sampler)
-        if not n_samples:
-            return loader
-        else:
-            return islice(loader, n_samples)
 
 if __name__ == "__main__":
 
