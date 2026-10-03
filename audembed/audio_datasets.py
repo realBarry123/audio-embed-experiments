@@ -82,22 +82,24 @@ class MIRDataset(Dataset):
         
         return audio_chunk.astype(np.float32) # shape: (C=2, T=chunk_size)
 
-    def get_loaders(self, valid_split, batch_size, seed=0) -> tuple[DataLoader, DataLoader]:
+    def get_loaders(self, subset=None, valid_split=0.2, batch_size=32, seed=0) -> tuple[DataLoader, DataLoader]:
         """
         Adapted from https://stackoverflow.com/a/50544887 2026-06-10
         """
-        dataset_size = len(self)
+        subset = self if not subset else torch.utils.data.Subset(self, range(subset))
+        dataset_size = len(subset)
         indices = list(range(dataset_size))
         split = int(np.floor(valid_split * dataset_size))
-
+        
         np.random.seed(seed)
         np.random.shuffle(indices)
-
+        
         train_sampler = SubsetRandomSampler(indices[split:])
         valid_sampler = SubsetRandomSampler(indices[:split])
-        train_loader = DataLoader(self, batch_size=batch_size, sampler=train_sampler)
-        valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
-
+        
+        train_loader = DataLoader(subset, batch_size=batch_size, sampler=train_sampler)
+        valid_loader = DataLoader(subset, batch_size=batch_size, sampler=valid_sampler)
+        
         return train_loader, valid_loader
 
     def get_minimal_loader(self, batch_size=1, seed=0, n_samples=None):
@@ -161,9 +163,10 @@ class AudioSetDataset(Dataset):
 
         return chunk
 
-    def get_loaders(self, valid_split: float = 0.2, batch_size: int = 32, seed: int = 0) -> tuple[DataLoader, DataLoader]:
+    def get_loaders(self, subset=None, valid_split=0.2, batch_size=32, seed=0) -> tuple[DataLoader, DataLoader]:
         """Create train/validation data loaders"""
-        dataset_size = len(self)
+        subset = self if not subset else torch.utils.data.Subset(self, range(subset))
+        dataset_size = len(subset)
         indices = list(range(dataset_size))
         split = int(np.floor(valid_split * dataset_size))
         
@@ -173,8 +176,8 @@ class AudioSetDataset(Dataset):
         train_sampler = SubsetRandomSampler(indices[split:])
         valid_sampler = SubsetRandomSampler(indices[:split])
         
-        train_loader = DataLoader(self, batch_size=batch_size, sampler=train_sampler)
-        valid_loader = DataLoader(self, batch_size=batch_size, sampler=valid_sampler)
+        train_loader = DataLoader(subset, batch_size=batch_size, sampler=train_sampler)
+        valid_loader = DataLoader(subset, batch_size=batch_size, sampler=valid_sampler)
         
         return train_loader, valid_loader
 

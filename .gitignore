@@ -219,3 +219,5 @@ __marimo__/
 
 # Misc
 *.DS_Store
+wandb
+*_old*
