@@ -84,25 +84,6 @@ def create_virtual_kernel(convs: list[nn.Module] | tuple[nn.Module], control=Fal
         conv_kernel = ConvLayer(module=conv, control=control)
         combined *= conv_kernel
     return combined
-
-class SnakeLinearized(nn.Module):
-    def __init__(self, features, module=None, alpha=None, beta=None):
-        super().__init__()
-        self.features = features
-        if module is not None:
-            self.register_buffer("alpha", module.alpha.detach().clone())
-            self.register_buffer("beta", module.beta.detach().clone())
-        else:
-            self.register_buffer("alpha", alpha.detach().clone())
-            self.register_buffer("beta", beta.detach().clone())
-        self.weight = torch.nn.Parameter(torch.zeros(1, features, 1))
-        self.bias = torch.nn.Parameter(torch.zeros(1, features, 1))
-
-    def original(self, x):
-        return torch.sin(self.alpha * x) ** 2 / self.beta
-
-    def forward(self, x):
-        return x * self.weight + self.bias
     
 
 if __name__ == "__main__":

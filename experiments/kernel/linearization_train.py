@@ -7,7 +7,7 @@ from tqdm import tqdm
 from diffusers import AutoencoderOobleck
 from dotenv import load_dotenv
 
-from audembed import conv, audio_datasets
+from audembed import snake, audio_datasets
 
 if not load_dotenv():
     raise SystemExit("No .env file found, please make one in the root directory")
@@ -25,13 +25,13 @@ vae = AutoencoderOobleck.from_pretrained(
 
 encoder = nnsight.NNsight(vae.encoder)
 
-EPOCHS = 4
+EPOCHS = 8
 DO_WANDB = False
 MODEL_NAME = "snake1lin"
 
 train_configs = {
     "batch_size": 1, 
-    "lr": 0.01,
+    "lr": 0.005,
     "epoch_size": 128
 }
 
@@ -46,13 +46,16 @@ train_loader, valid_loader = dataset.get_loaders(
 
 try: 
     state_dict, features, start_epoch = torch.load(f"experiments/kernel/models/{MODEL_NAME}.pt")
-    model = conv.SnakeLinearized(features).to(DEVICE)
+    model = snake.SnakeLinearized(features).to(DEVICE)
     model.load_state_dict(state_dict)
-except:
-    model = conv.SnakeLinearized(
+    print(f"loaded up old run, starting epoch {start_epoch}")
+except FileNotFoundError:
+    model = snake.SnakeLinearized(
         features=encoder.block[0].res_unit1.conv1.weight.shape[0], # out_features
         module=encoder.block[0].res_unit1.snake1
     ).to(DEVICE)
+    start_epoch = 0
+    print("initialized new model")
 
 if DO_WANDB:
     run = wandb.init(
@@ -63,7 +66,7 @@ if DO_WANDB:
 
 optim = torch.optim.Adam(params=model.parameters(), lr=train_configs["lr"])
 
-for epoch in range(EPOCHS):
+for epoch in range(start_epoch, start_epoch + EPOCHS):
     total_loss = 0
     total = 0
 
@@ -86,7 +89,7 @@ for epoch in range(EPOCHS):
     if DO_WANDB: run.log({"train_loss": total_loss / total})
     else: print(f"E{epoch} train_loss: {total_loss / total}")
 
-    torch.save([model.state_dict(), model.features, epoch], f"experiments/kernel/models/{MODEL_NAME}.pt")
+    torch.save([model.state_dict(), model.features, epoch + 1], f"experiments/kernel/models/{MODEL_NAME}.pt")
 
     total_loss = 0
     total = 0
