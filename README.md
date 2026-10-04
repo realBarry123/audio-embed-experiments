@@ -10,12 +10,11 @@ An sparse autoencoder (SAE) was trained on the VAE latent. A linear probe traine
 See [experiments/sae/sae.py](experiments/sae/sae.py) and [experiments/sae/probe.py](experiments/sae/probe.py). 
 
 ### 2: Some convolutional layers may be merged
-Convolutional layers in the Oobleck autoencoder are interleaved with [snake beta activation functions](https://www.desmos.com/calculator/bdzfglog7l) ([Ziyin et al. 2020](https://doi.org/10.48550/arXiv.2006.08195))([Lee et al. 2022](https://doi.org/10.48550/arXiv.2206.04658)). By either removing or linearizing them, we can use convolution to combine the convolutional kernels of both layers into a higher-resolution kernel more suitable for analysis. I showed that for some snake activations, ablation preserves the ability of the VAE to reconstruct most audio samples. 
+Convolutional layers in the Oobleck autoencoder are interleaved with [snake beta activation functions](https://www.desmos.com/calculator/bdzfglog7l) ([Ziyin et al. 2020](https://doi.org/10.48550/arXiv.2006.08195))([Lee et al. 2022](https://doi.org/10.48550/arXiv.2206.04658)). By either removing or linearizing them, we can use convolution to combine the convolutional kernels of both layers into a higher-resolution kernel more suitable for analysis. I showed that for some snake activations, both ablation and linearization (via element-wise linear regression) preserve the ability of the VAE to reconstruct most audio samples. 
 
-See [experiments/kernel/results/ablation](experiments/kernel/results/ablation) for the results of ablating the first snake layer (**IMPORTANT: `2_ablated_recon.wav` is very loud and abrasive, listen at low volume**). 
+See [experiments/kernel/results/ablation](experiments/kernel/results/ablation) for the results of ablating the first snake layer and (**IMPORTANT: some sounds may be very loud, listen at low volume**). 
 
 ## To-do
-- [ ] Snake linearization (via linear regression on data) rather than ablation
 - [ ] Analyze kernels for similarity to Gabor filters or possible edge detectors
 - [ ] Probe earlier layers of the VAE (if conv kernels are Gabor filters, these representations should be monotonically probeable)
 - [ ] Try other models (e.g. Wav2vec 2.0 ([Baevski et al. 2020](https://doi.org/10.48550/arXiv.2006.11477)), which uses GELU ([Hendrycks & Gimpel 2016](https://doi.org/10.48550/arXiv.1606.08415)) rather than snake in its convolutional encoder)
