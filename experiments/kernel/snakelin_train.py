@@ -31,7 +31,7 @@ MODEL_NAME = "snake1lin"
 
 train_configs = {
     "batch_size": 1, 
-    "lr": 0.005,
+    "lr": 0.01,
     "epoch_size": 128
 }
 

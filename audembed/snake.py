@@ -18,7 +18,8 @@ class SnakeLinearized(nn.Module):
             torch.zeros(1, features, 1) if beta is None 
             else beta.detach().clone()
         )
-        self.weight = torch.nn.Parameter(torch.zeros(1, features, 1))
+        # Initialize as identity
+        self.weight = torch.nn.Parameter(torch.ones(1, features, 1))
         self.bias = torch.nn.Parameter(torch.zeros(1, features, 1))
 
     def original(self, x):
