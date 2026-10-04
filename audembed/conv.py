@@ -1,6 +1,7 @@
 from __future__ import annotations
 import torch
 from torch import nn
+from snake import SnakeLinearized
 
 class ConvLayer():
     def __init__(self, module: nn.Module=None, weight=None, bias=None, control=False):

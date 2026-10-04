@@ -24,7 +24,7 @@ encoder = nnsight.NNsight(vae.encoder)
 
 N_SAMPLES = 3
 dataset = audio_datasets.AudioSetDataset(chunk_duration=2.0, device=DEVICE)
-loader = dataset.get_minimal_loader(n_samples=N_SAMPLES)
+loader = dataset.get_minimal_loader(subset=N_SAMPLES)
 
 ABLATED_LAYERS = [
     encoder.block[0].res_unit1.snake1,
