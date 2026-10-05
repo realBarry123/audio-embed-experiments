@@ -1,10 +1,10 @@
 import math
 import torch
 from torch import nn
-from einops import rearrange, repeat
+from einops import rearrange
 import matplotlib.pyplot as plt
 
-TAU = 2 * torch.tensor(math.pi) # 2pi is for the deranged
+TAU = 2 * math.pi # What's your point? I do what I want. 
 EPS = 1e-8
 
 class GaborRegression(nn.Module):
@@ -20,7 +20,7 @@ class GaborRegression(nn.Module):
         # Init variance based on distributions defined by abs(kernels)
         self.centres = torch.linspace(0.5, self.kernel_size - 0.5, steps=self.kernel_size).unsqueeze(0)
         # self.centres = repeat(self.centres, "ker -> batch ker", batch=self.batch)
-        squared_deviations = torch.abs(self.kernels) * (self.centres - self.mean)**2
+        squared_deviations = self.kernels.abs() * (self.centres - self.mean)**2
         self.var = nn.Parameter(squared_deviations.mean(dim=1, keepdim=True))
 
         # Init frequency as half the number of inflection points per kernel
@@ -28,31 +28,32 @@ class GaborRegression(nn.Module):
         prev_sign = torch.zeros(self.batch)
         for k in range(self.kernel_size-1):
             cur_sign = torch.sign(torch.diff(self.kernels, dim=1)[:, k])
-            sign_diff = torch.abs(cur_sign - prev_sign)
+            sign_diff = (cur_sign - prev_sign).abs()
             critical_points += torch.where(sign_diff == 2, 1, 0)
             prev_sign = cur_sign
         self.frequency = nn.Parameter(critical_points / 2 / self.kernel_size).unsqueeze(1)
 
         # Init phase st the max peak aligns with the peak of the cosine function
-        self.phase = nn.Parameter(torch.argmax(self.kernels, dim=1, keepdim=True).to(torch.float32))
+        self.phase = nn.Parameter(self.kernels.argmax(dim=1, keepdim=True).to(torch.float32))
 
         # Init scale st: 
         # scale * (1/sqrt(TAU*var)) = kernel_mag => scale = kernel_mag * TAU * var
-        kernel_magnitude = torch.max(torch.abs(self.kernels), dim=1, keepdim=True).values
+        kernel_magnitude = self.kernels.abs().max(dim=1, keepdim=True).values
         self.scale = nn.Parameter(kernel_magnitude * TAU * self.var)
 
     def gaussian(self, x):
-        # Normal distribution
-        return 1 / torch.sqrt(TAU*self.var) * torch.exp(-0.5 * (x-self.mean)**2 / (self.var+EPS))
+        """Probability density of normal distribution based on parameters of self"""
+        return 1/torch.sqrt(TAU*self.var) * torch.exp(-0.5 * (x-self.mean)**2 / (self.var+EPS))
 
     def forward(self, x):
-        # x.shape == [256, ker]
+        # x.shape == [batch=256, ker]
         print(self.frequency.shape, x.shape)
         wave = torch.cos(TAU * self.frequency * x - self.phase)
         return self.scale * self.gaussian(x) * wave
 
     @property
     def r_squared(self):
+        """https://en.wikipedia.org/wiki/Coefficient_of_determination"""
         y_pred = self.forward(self.centres)
         y = self.kernels
         ss_res = ((y - y_pred) ** 2).sum(dim=1, keepdim=True)
@@ -73,13 +74,20 @@ class GaborRegression(nn.Module):
                 f")"
             )
     
-    def plot(self, index: int):
+    def plot(self, index: int, include_envelope=False):
+
+        xs = torch.linspace(0, self.kernel_size, steps=self.kernel_size * 10)
+        gabor_ys = self.forward(xs.unsqueeze(0))[index].detach()
+        plt.plot(xs, gabor_ys, color="blue")
+        
+        if include_envelope: 
+            envelope_ys = (self.scale * self.gaussian(xs.unsqueeze(0)))[index].detach()
+            plt.plot(xs, envelope_ys, color="lightblue")
+
         ker_xs = self.centres[0]
         ker_ys = self.kernels[index]
-        gabor_xs = torch.linspace(0, self.kernel_size, steps=self.kernel_size * 10)
-        gabor_ys = self.forward(gabor_xs.unsqueeze(0))[index].detach()
-        plt.scatter(ker_xs, ker_ys)
-        plt.plot(gabor_xs, gabor_ys)
+        plt.stem(ker_xs, ker_ys, linefmt="black", markerfmt=".", basefmt="black")
+
         plt.show()
 
 
