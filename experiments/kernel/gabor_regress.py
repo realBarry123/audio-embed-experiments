@@ -2,15 +2,10 @@ import math
 import torch
 from torch import nn
 from einops import rearrange, repeat
+import matplotlib.pyplot as plt
 
 TAU = 2 * torch.tensor(math.pi) # 2pi is for the deranged
 EPS = 1e-8
-
-def sign(x: torch.Tensor):
-    signs = torch.zeros(x.shape)
-    signs = torch.where(x < 0, -1, 0)
-    signs = torch.where(x > 0, 1, 0)
-    return signs
 
 class GaborRegression(nn.Module):
     def __init__(self, kernel):
@@ -28,15 +23,15 @@ class GaborRegression(nn.Module):
         squared_deviations = torch.abs(self.kernels) * (centres - self.mean.unsqueeze(1))**2
         self.var = nn.Parameter(squared_deviations.mean(dim=1))
 
-        # Init frequency as the number of zero crossings
-        zero_crossings = torch.zeros(self.batch)
+        # Init frequency as half the number of inflection points per kernel
+        critical_points = torch.zeros(self.batch)
         prev_sign = torch.zeros(self.batch)
-        for k in range(self.kernel_size):
-            cur_sign = sign(self.kernels[:, k])
+        for k in range(self.kernel_size-1):
+            cur_sign = torch.sign(torch.diff(self.kernels, dim=1)[:, k])
             sign_diff = torch.abs(cur_sign - prev_sign)
-            zero_crossings += torch.where(sign_diff == 2, 1, 0)
+            critical_points += torch.where(sign_diff == 2, 1, 0)
             prev_sign = cur_sign
-        self.frequency = nn.Parameter(zero_crossings / 2 / self.kernel_size)
+        self.frequency = nn.Parameter(critical_points / 2 / self.kernel_size)
 
         # Init phase st the max peak aligns with the peak of the cosine function
         self.phase = nn.Parameter(torch.argmax(self.kernels, dim=1).to(torch.float32))
@@ -46,19 +41,6 @@ class GaborRegression(nn.Module):
         kernel_magnitude = torch.max(torch.abs(self.kernels), dim=1, keepdim=False).values
         self.scale = nn.Parameter(kernel_magnitude * TAU * self.var)
 
-    def __str__(self):
-        return (
-            f"GaborRegression(\n"
-            f"\tbatch={self.batch},\n"
-            f"\tkernel_size={self.kernel_size},\n"
-            f"\tmean: {self.mean.shape},\n"
-            f"\tvar: {self.var.shape},\n"
-            f"\tfrequency: {self.frequency.shape},\n"
-            f"\tphase: {self.frequency.shape},\n"
-            f"\tscale: {self.scale.shape}\n"
-            f")"
-        )
-
     def gaussian(self, x):
         # Normal distribution
         return 1 / torch.sqrt(TAU*self.var) * torch.exp(-0.5 * (x-self.mean)**2 / (self.var+EPS))
@@ -67,11 +49,35 @@ class GaborRegression(nn.Module):
         wave = torch.cos(TAU * self.frequency * x - self.phase)
         return self.scale * self.gaussian(x) * wave
 
+    def __str__(self):
+            return (
+                f"GaborRegression(\n"
+                f"\tbatch={self.batch},\n"
+                f"\tkernel_size={self.kernel_size},\n"
+                f"\tmean: {self.mean.shape},\n"
+                f"\tvar: {self.var.shape},\n"
+                f"\tfrequency: {self.frequency.shape},\n"
+                f"\tphase: {self.frequency.shape},\n"
+                f"\tscale: {self.scale.shape}\n"
+                f")"
+            )
+    
+    def plot(self, index: int):
+        ker_xs = torch.linspace(0.5, self.kernel_size - 0.5, steps=self.kernel_size)
+        ker_ys = self.kernels[index]
+        gabor_xs = torch.linspace(0, self.kernel_size, steps=self.kernel_size * 10)
+        gabor_ys = self.forward(gabor_xs.unsqueeze(1))[:, index].detach()
+        plt.scatter(ker_xs, ker_ys)
+        plt.plot(gabor_xs, gabor_ys)
+        plt.show()
+
+
 def get_r_squared():
     pass
 
 
 if __name__ == "__main__":
-    kernel = torch.load("experiments/kernel/results/conv1_weight.pt")
+    kernel = torch.load("experiments/kernel/results/virtual_kernel.pt")
     regression = GaborRegression(kernel)
     print(regression)
+    regression.plot(1)
