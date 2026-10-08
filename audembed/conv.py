@@ -1,12 +1,15 @@
 from __future__ import annotations
 import torch
 from torch import nn
-from snake import SnakeLinearized
+from audembed.snake import SnakeLinearized
 
 class ConvLayer():
-    def __init__(self, module: nn.Module=None, weight=None, bias=None, control=False):
+    def __init__(self, module: nn.Module=None, weight=None, bias=None, control=False, in_features=None, out_features=None):
         self.weight = None
         self.bias = None
+        if in_features is not None and out_features is not None:
+            self.weight = torch.ones((out_features, in_features, 1))
+            self.bias = torch.zeros((out_features,))
         if module is not None:
             module = nn.utils.remove_weight_norm(module)
             self.weight = module.weight.detach().clone().cpu()
@@ -43,14 +46,13 @@ class ConvLayer():
                 other.weight, other.bias
             )
             return ConvLayer(weight=weight, bias=bias)
-        elif type(other) is SnakeLinearized:
+        if type(other) is SnakeLinearized:
             weight, bias = self._combine_conv1d(
                 self.weight, self.bias,
                 torch.diag(other.weight.detach()).unsqueeze(0), other.bias.detach()
             )
             return weight, bias
-        else:
-            raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
+        raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
     
     def __imul__(self, other: ConvLayer | SnakeLinearized):
         if type(other) is ConvLayer:
@@ -58,13 +60,14 @@ class ConvLayer():
                 self.weight, self.bias, 
                 other.weight, other.bias
             )
-        elif type(other) is SnakeLinearized:
+            return self
+        if type(other) is SnakeLinearized:
             self.weight, self.bias = self._combine_conv1d(
                 self.weight, self.bias,
                 torch.diag(other.weight.detach()).unsqueeze(0), other.bias.detach()
             )
-        else:
-            raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
+            return self
+        raise TypeError(f"cannot multiply type ConvLayer by type {type(other)}")
 
     def __add__(self, other: ConvLayer):
         return ConvLayer(
@@ -88,9 +91,9 @@ def create_virtual_kernel(convs: list[nn.Module] | tuple[nn.Module], control=Fal
     
 
 if __name__ == "__main__":
+
     import data
     x = torch.randn((2, 64))
-
     layers = [
         ConvLayer(weight=torch.randn((128, 2, 7)), bias=torch.randn((128,))),
         ConvLayer(weight=torch.randn((128, 128, 7)), bias=torch.randn((128,))),
