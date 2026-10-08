@@ -88,7 +88,37 @@ def create_virtual_kernel(convs: list[nn.Module] | tuple[nn.Module], control=Fal
         conv_kernel = ConvLayer(module=conv, control=control)
         combined *= conv_kernel
     return combined
+
+def virtual_kernel(module: nn.Module, module_type: str) -> ConvLayer:
+    if module_type == "res_unit":
+        residual_stream = ConvLayer(
+            in_features=module.conv1.weight.shape[1],
+            out_features=module.conv2.weight.shape[0]
+        ) # identity kernel skip connection
+        return residual_stream + ConvLayer(module.conv1) * ConvLayer(module.conv2)
     
+    if module_type == "block":
+        res_units = (module.res_unit1, module.res_unit2, module.res_unit3)
+        res_units = [virtual_kernel(unit, "res_unit") for unit in res_units]
+        combined = ConvLayer(
+            in_features=res_units[0].weight.shape[1],
+            out_features=res_units[0].weight.shape[1]
+        ) # init as identity
+        for unit in res_units:
+            combined *= unit
+        combined *= ConvLayer(module.conv1)
+        return combined
+    
+    if module_type == "encoder":
+        raise NotImplementedError("don't do this, virtual_kernel for \"encoder\" is not accelerated yet and will take forever on your potato cpu")
+        combined = ConvLayer(module.conv1)
+        for block in module.block:
+            combined *= virtual_kernel(block, "block")
+        combined *= ConvLayer(module.conv2)
+        return combined
+    raise ValueError(f'"{module_type}" is not a valid module type')
+        
+
 
 if __name__ == "__main__":
 

@@ -14,10 +14,11 @@ if not CACHE_PATH:
 vae = AutoencoderOobleck.from_pretrained(
     "stabilityai/stable-audio-open-1.0",
     subfolder="vae",
-    torch_dtype=torch.float16,
+    torch_dtype=torch.float32,
     cache_dir=CACHE_PATH
 ).to("cpu")
 
+"""
 CONV_LAYERS = [
     vae.encoder.conv1,
     vae.encoder.block[0].res_unit1.conv1,
@@ -27,19 +28,23 @@ CONV_LAYERS = [
 ]
 virtual_kernel = conv.create_virtual_kernel(CONV_LAYERS, control=False)
 print(virtual_kernel.shape)
+"""
+
+# virtual_kernel = conv.virtual_kernel(vae.encoder.block[0], "block").weight
+virtual_kernel = conv.virtual_kernel(vae.encoder, "encoder").weight
 
 START = 0
-N_PLOTS = 4
-CHANNEL = 1
+N_PLOTS = (5, 4)
+CHANNEL = 0
 import matplotlib.pyplot as plt
-plt.rcParams['figure.figsize'] = [5, 8]
-fig, axs = plt.subplots(N_PLOTS)
-for i in range(N_PLOTS):
-    axs[i].plot(virtual_kernel[START+i, CHANNEL, :])
-    axs[i].set_title(f"virtual_weight[{START+i}][{CHANNEL}]")
-    axs[i].set_xlabel("kernel")
-    axs[i].set_ylabel("weight")
+plt.rcParams['figure.figsize'] = [16, 8]
+fig, axs = plt.subplots(*N_PLOTS)
+for i in range(len(axs.flat)):
+    axs.flat[i].plot(virtual_kernel[START+i, CHANNEL, :])
+    axs.flat[i].set_title(f"virtual_weight[{START+i}][{CHANNEL}]")
+    axs.flat[i].set_xlabel("kernel")
+    axs.flat[i].set_ylabel("weight")
 fig.tight_layout()
 plt.show()
-exit()
+
 torch.save(virtual_kernel, "experiments/kernel/results/virtual_kernel.pt")
